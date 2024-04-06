@@ -1,0 +1,23 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Machine Learning Results</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Machine Learning Results</h1>
+
+    <!-- take image and display -->
+    <h2>Stored Image</h2>
+    <img src="data:image/png;base64,{{ encoded_image }}" alt="Tester Photo">
+
+    <!-- display results (once obtained) -->
+    <h2>Machine Learning Results</h2>
+    <!-- <ul>
+        {% for result in results %}
+            <li>{{ result }}</li>
+        {% endfor %}
+    </ul> -->
+</body>
+</html>
