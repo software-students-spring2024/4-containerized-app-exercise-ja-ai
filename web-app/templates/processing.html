@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image Processing</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        // Function to check the processing status
+        function checkStatus() {
+            var imageId = "{{ image_id }}";
+            $.getJSON("/check_status/" + imageId, function(data) {
+                if (data.status === "processed") {
+                    // Redirect to the results page once processing is complete
+                    window.location.href = "/results/" + imageId;
+                } else {
+                    // Check again after a delay if not processed
+                    setTimeout(checkStatus, 2000); // 2 seconds
+                }
+            }).fail(function() {
+                console.log("Error checking status.");
+                //add troubleshooting messages
+            });
+        }
+
+        // Call checkStatus() when the page is fully loaded
+        $(document).ready(function() {
+            setTimeout(checkStatus, 2000); // Start checking after 2 seconds
+        });
+    </script>
+</head>
+<body>
+    <h2>Your image is currently being processed. Please wait...</h2>
+</body>
+</html>
