@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
 import gridfs
@@ -9,6 +9,7 @@ import base64
 import tempfile
 import sys
 import os
+import bson
 
 machine_learning_client_path = os.path.abspath('../machine-learning-client')
 sys.path.insert(0, machine_learning_client_path)
@@ -35,35 +36,33 @@ def process_images(app):
         while True:
             image_doc = images_collection.find_one({"status": "pending"})
             if image_doc:
-                # Retrieve image from GridFS
                 try:
                     grid_out = fs.get(image_doc['image_id'])
                     _, temp_filepath = tempfile.mkstemp()
                     with open(temp_filepath, 'wb') as f:
                         f.write(grid_out.read())
 
-                    # Process image using DeepFace
                     result = analyze_image(temp_filepath)
-                    os.remove(temp_filepath)  # Clean up the temporary file
+                    os.remove(temp_filepath)
 
                     # Update the database with analysis results
                     images_collection.update_one(
                         {"_id": image_doc["_id"]},
                         {"$set": {"status": "processed"}}
                     )
-                    results_collection.insert_one({
+                    result_id = results_collection.insert_one({
                         "image_id": image_doc["image_id"],
                         "filename": image_doc["filename"],
-                        "analysis": result,
+                        "analysis": result,  # Save the analysis results in the database
                         "upload_date": image_doc["upload_date"]
-                    })
+                    }).inserted_id
                     print(f"Processed image: {image_doc['filename']} with results: {result}")
+
                 except Exception as e:
                     print(f"Error processing image {image_doc['filename']}: {e}")
-
             else:
                 print("No images to process.")
-            time.sleep(5)  # Check for new images every 5 seconds
+            time.sleep(5)
 
 
 @app.route('/', methods=['GET'])
@@ -83,30 +82,52 @@ def upload_image():
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             image_id = fs.put(image, filename=filename)
-            actual_age = request.form.get('actual_age', None)  # Get 'actual_age' from the form
             images_collection.insert_one({
                 'image_id': image_id,
                 'filename': filename,
                 'status': 'pending',
                 'upload_date': datetime.now(),
-                'actual_age': actual_age  # Include 'actual_age' in the document
             })
             flash('Image successfully uploaded and awaiting processing.', 'success')
-            return redirect(url_for('home'))
+            return redirect(url_for('processing', image_id=str(image_id)))
     return render_template('upload.html')
 
-@app.route('/results')
-def show_results():
-    results = list(results_collection.find({}, {'_id': 0}))
-    for result in results:
+@app.route('/processing/<image_id>')
+def processing(image_id):
+    return render_template('processing.html', image_id=image_id)
+
+@app.route('/check_status/<image_id>')
+def check_status(image_id):
+    try:
+        image_id = bson.ObjectId(image_id)
+    except bson.errors.InvalidId:
+        return jsonify({'status': 'error', 'message': 'Invalid image ID'}), 400
+    image_doc = images_collection.find_one({'image_id': image_id})
+    if image_doc and image_doc['status'] == 'processed':
+        return jsonify({'status': 'processed', 'image_id': str(image_id)})
+    else:
+        return jsonify({'status': 'pending'})
+
+@app.route('/results/<image_id>')
+def show_results(image_id):
+    try:
+        image_id = bson.ObjectId(image_id)
+    except bson.errors.InvalidId:
+        return "Invalid image ID", 400
+    result = results_collection.find_one({"image_id": image_id}, {'_id': 0})
+    if result:
         try:
-            fs_image = fs.get(result['image_id'])
+            fs_image = fs.get(image_id)
             result['image_data'] = base64.b64encode(fs_image.read()).decode('utf-8')
         except:
             result['image_data'] = None
-    return render_template('results.html', results=results)
+        return render_template('results.html', results=[result], filename=result['filename'])
+    else:
+        flash('Result not found.', 'error')
+        return redirect(url_for('home'))
 
 if __name__ == '__main__':
     processing_thread = threading.Thread(target=process_images, args=(app,))
+    processing_thread.daemon = True
     processing_thread.start()
     app.run(debug=True)

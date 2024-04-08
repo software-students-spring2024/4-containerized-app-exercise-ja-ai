@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Results</title>
+    <title>Analysis Results</title>
 </head>
 <body>
     <h2>Analysis Results</h2>
@@ -19,8 +19,12 @@
     {% for result in results %}
         <div>
             <h3>{{ result.filename }}</h3>
-            <p>Age Estimation: {{ result.age_estimation }}</p>
-            <p>Actual Age: {{ result.actual_age }}</p>
+            {% for analysis in result.analysis %}
+                <p>Age: {{ analysis.age }}</p>
+                <p>Gender: {{ analysis.dominant_gender }}</p>
+                <p>Confidence: {{ analysis.face_confidence }}</p>
+                <hr>
+            {% endfor %}
         </div>
     {% endfor %}
 </body>
