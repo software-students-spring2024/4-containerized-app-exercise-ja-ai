@@ -61,13 +61,10 @@ def process_images(app):
                         "predicted_age":predicted_age,
                         "gender":dominant_gender,
                         "actual_age":actual_age,
-                        
-                        # "filename": image_doc["filename"],
-                        # "analysis": result,  # Save the analysis results in the database
-                        # "upload_date": image_doc["upload_date"]
+                        "upload_date": image_doc["upload_date"],
+   
                     })
                     fs.delete(image_doc['image_id'])
-                    # images_collection.delete_one({"_id": image_doc['_id']})
                     print(f"Processed and removed image: {image_doc['filename']} with results: {result}")
 
                 except Exception as e:
