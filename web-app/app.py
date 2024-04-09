@@ -50,13 +50,25 @@ def process_images(app):
                         {"_id": image_doc["_id"]},
                         {"$set": {"status": "processed"}}
                     )
-                    result_id = results_collection.insert_one({
+
+                    predicted_age = result[0]['age']
+                    gender_scores = result[0]['gender']
+                    dominant_gender = "Man" if gender_scores["Man"] > gender_scores['Woman'] else "Woman"
+                    actual_age = image_doc.get("actual_age")
+
+                    results_collection.insert_one({
                         "image_id": image_doc["image_id"],
-                        "filename": image_doc["filename"],
-                        "analysis": result,  # Save the analysis results in the database
-                        "upload_date": image_doc["upload_date"]
-                    }).inserted_id
-                    print(f"Processed image: {image_doc['filename']} with results: {result}")
+                        "predicted_age":predicted_age,
+                        "gender":dominant_gender,
+                        "actual_age":actual_age,
+                        
+                        # "filename": image_doc["filename"],
+                        # "analysis": result,  # Save the analysis results in the database
+                        # "upload_date": image_doc["upload_date"]
+                    })
+                    fs.delete(image_doc['image_id'])
+                    # images_collection.delete_one({"_id": image_doc['_id']})
+                    print(f"Processed and removed image: {image_doc['filename']} with results: {result}")
 
                 except Exception as e:
                     print(f"Error processing image {image_doc['filename']}: {e}")
@@ -82,13 +94,15 @@ def upload_image():
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             image_id = fs.put(image, filename=filename)
+            actual_age = request.form.get("actual_age")
             images_collection.insert_one({
                 'image_id': image_id,
                 'filename': filename,
                 'status': 'pending',
                 'upload_date': datetime.now(),
+                "actual_age":actual_age,
             })
-            flash('Image successfully uploaded and awaiting processing.', 'success')
+            # flash('Image successfully uploaded and awaiting processing.', 'success')
             return redirect(url_for('processing', image_id=str(image_id)))
     return render_template('upload.html')
 
@@ -104,6 +118,7 @@ def check_status(image_id):
         return jsonify({'status': 'error', 'message': 'Invalid image ID'}), 400
     image_doc = images_collection.find_one({'image_id': image_id})
     if image_doc and image_doc['status'] == 'processed':
+        images_collection.delete_one({"_id": image_doc['_id']})
         return jsonify({'status': 'processed', 'image_id': str(image_id)})
     else:
         return jsonify({'status': 'pending'})
@@ -121,7 +136,7 @@ def show_results(image_id):
             result['image_data'] = base64.b64encode(fs_image.read()).decode('utf-8')
         except:
             result['image_data'] = None
-        return render_template('results.html', results=[result], filename=result['filename'])
+        return render_template('results.html', results=[result])
     else:
         flash('Result not found.', 'error')
         return redirect(url_for('home'))
