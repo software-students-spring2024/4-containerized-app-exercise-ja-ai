@@ -16,16 +16,16 @@
         {% endif %}
     {% endwith %}
     
-    {% for result in results %}
-        <div>
-            <h3>{{ result.filename }}</h3>
-            {% for analysis in result.analysis %}
-                <p>Age: {{ analysis.age }}</p>
-                <p>Gender: {{ analysis.dominant_gender }}</p>
-                <p>Confidence: {{ analysis.face_confidence }}</p>
-                <hr>
-            {% endfor %}
-        </div>
-    {% endfor %}
+    {% if results %}
+        {% for result in results %}
+            <div>
+                <p>Predicted Age: {{ result.predicted_age }}</p>
+                <p>Predicted Gender: {{ result.gender }}</p>
+                <p>Actual age: {{ result.actual_age }}</p>
+            </div>
+        {% endfor %}
+    {% else %}
+            <p>No analysis results to display</p>
+    {% endif %}
 </body>
 </html>
