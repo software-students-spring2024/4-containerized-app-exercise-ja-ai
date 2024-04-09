@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 import gridfs
 from datetime import datetime
 import threading
@@ -26,6 +27,8 @@ fs = gridfs.GridFS(db)
 
 images_collection = db["images_pending_processing"]
 results_collection = db["image_processing_results"]
+results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=True)
+
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -55,15 +58,17 @@ def process_images(app):
                     gender_scores = result[0]['gender']
                     dominant_gender = "Man" if gender_scores["Man"] > gender_scores['Woman'] else "Woman"
                     actual_age = image_doc.get("actual_age")
-
-                    results_collection.insert_one({
-                        "image_id": image_doc["image_id"],
-                        "predicted_age":predicted_age,
-                        "gender":dominant_gender,
-                        "actual_age":actual_age,
-                        "upload_date": image_doc["upload_date"],
-   
-                    })
+                    try:
+                        results_collection.insert_one({
+                            "image_id": image_doc["image_id"],
+                            "predicted_age":predicted_age,
+                            "gender":dominant_gender,
+                            "actual_age":actual_age,
+                            "upload_date": image_doc["upload_date"],
+    
+                        })
+                    except DuplicateKeyError:
+                        print("Duplicate entry found, not inserting.")
                     fs.delete(image_doc['image_id'])
                     print(f"Processed and removed image: {image_doc['filename']} with results: {result}")
 
