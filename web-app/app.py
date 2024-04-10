@@ -42,7 +42,7 @@ results_collection = db["image_processing_results"]
 results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=True)
 
 def gen_frames():
-    globalcapture, record_frame
+    global capture, record_frame
     while True:
         success, frame = camera.read()
         if success:
@@ -124,9 +124,9 @@ def tasks():
             capture = 1
 
     elif request.method == 'GET':
-        return render_template('index.html')
+        return render_template('upload.html')
 
-    return render_template('index.html')
+    return render_template('upload.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
