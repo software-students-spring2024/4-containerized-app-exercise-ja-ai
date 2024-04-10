@@ -1,0 +1,4 @@
+deepface
+Flask
+pymongo
+tf_keras
