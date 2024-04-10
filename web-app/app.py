@@ -42,7 +42,7 @@ def allowed_file(filename):
     """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def process_images(app):
+def process_images(flask_app):
     """
     Continously check for and process pending images in the MongoDB
     Each image is analyzed, and the results are updated in the database
@@ -50,7 +50,7 @@ def process_images(app):
     Args:
         app (Flask): The Flask application object for context
     """
-    with app.app_context():
+    with flask_app.app_context():
         while True:
             image_doc = images_collection.find_one({"status": "pending"})
             if image_doc:
@@ -89,8 +89,8 @@ def process_images(app):
                         f"Processed and removed image: {image_doc['filename']} "
                         f"with results: {result}"
                     )
-                except Exception as e:
-                    print(f"Error processing image {image_doc['filename']}: {e}")
+                except:
+                    print(f"Error processing image {image_doc['filename']}")
             else:
                 print("No images to process.")
             time.sleep(5)
@@ -199,9 +199,9 @@ def show_results(image_id):
         try:
             fs_image = fs.get(image_id)
             image_data = base64.b64encode(fs_image.read()).decode('utf-8')
-        except Exception as e:
+        except:
             # flash('Error retrieving image data', 'error')
-            print(f"Error retrieving image data: {e}")
+            # print(f"Error retrieving image data: {e}")
             image_data = None
 
         predicted_age = result.get('predicted_age')
