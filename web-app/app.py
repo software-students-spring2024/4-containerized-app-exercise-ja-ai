@@ -8,7 +8,6 @@ import sys
 import tempfile
 import threading
 import time
-from collections import Counter
 from datetime import datetime
 from flask import Flask, jsonify, flash, redirect, render_template, request, url_for
 import bson
@@ -69,7 +68,6 @@ def process_images(app):
                         {"_id": image_doc["_id"]},
                         {"$set": {"status": "processed"}}
                     )
-
                     predicted_age = result[0]['age']
                     # gender_scores = result[0]['gender']
                     # # dominant_gender = "Man" 
@@ -96,7 +94,6 @@ def process_images(app):
             else:
                 print("No images to process.")
             time.sleep(5)
-
 
 @app.route('/', methods=['GET'])
 def home():
@@ -188,7 +185,8 @@ def show_results(image_id):
     Calls the results.html page
 
     Returns:
-        Redirects: Redirects you to the results page if everything worked correctly, or to the homepage if there were errors
+        Redirects: Redirects you to the results page if everything worked 
+                    correctly, or to the homepage if there were errors
     """
     try:
         image_id = bson.ObjectId(image_id)
@@ -224,9 +222,6 @@ def show_results(image_id):
 
 
 if __name__ == '__main__':
-    """
-    Main methods
-    """
     processing_thread = threading.Thread(target=process_images, args=(app,))
     processing_thread.daemon = True
     processing_thread.start()
