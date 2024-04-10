@@ -87,9 +87,10 @@ def process_images(app):
                     except errors.DuplicateKeyError:
                         print("Duplicate entry found, not inserting.")
                     fs.delete(image_doc['image_id'])
-                    print(f"Processed and removed image: 
-                          {image_doc['filename']} with results: {result}")
-
+                    print(
+                        f"Processed and removed image: {image_doc['filename']} "
+                        f"with results: {result}"
+                    )
                 except Exception as e:
                     print(f"Error processing image {image_doc['filename']}: {e}")
             else:
