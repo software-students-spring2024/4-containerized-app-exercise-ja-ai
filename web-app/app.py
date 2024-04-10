@@ -1,3 +1,7 @@
+"""
+Flask App
+"""
+
 import base64
 import os
 import sys
@@ -67,8 +71,10 @@ def process_images(app):
                     )
 
                     predicted_age = result[0]['age']
-                    gender_scores = result[0]['gender']
-                    dominant_gender = "Man" if gender_scores["Man"] > gender_scores['Woman'] else "Woman"
+                    # gender_scores = result[0]['gender']
+                    # # dominant_gender = "Man" 
+                    # # if gender_scores["Man"] < gender_scores['Woman']:
+                    # #     dominant_gender = "Woman"
                     actual_age = image_doc.get("actual_age")
                     try:
                         results_collection.insert_one({
@@ -77,12 +83,12 @@ def process_images(app):
                             # "gender":dominant_gender,
                             "actual_age":actual_age,
                             "upload_date": image_doc["upload_date"],
-    
                         })
                     except errors.DuplicateKeyError:
                         print("Duplicate entry found, not inserting.")
                     fs.delete(image_doc['image_id'])
-                    print(f"Processed and removed image: {image_doc['filename']} with results: {result}")
+                    print(f"Processed and removed image: 
+                          {image_doc['filename']} with results: {result}")
 
                 except Exception as e:
                     print(f"Error processing image {image_doc['filename']}: {e}")
@@ -173,8 +179,7 @@ def check_status(image_id):
     if image_doc and image_doc['status'] == 'processed':
         images_collection.delete_one({"_id": image_doc['_id']})
         return jsonify({'status': 'processed', 'image_id': str(image_id)})
-    else:
-        return jsonify({'status': 'pending'})
+    return jsonify({'status': 'pending'})
 
 @app.route('/results/<image_id>')
 def show_results(image_id):
@@ -212,10 +217,8 @@ def show_results(image_id):
 
         # Pass the updated 'result' dictionary to the template
         return render_template('results.html', result=result)
-
-    else:
-        flash('Result not found.', 'error')
-        return redirect(url_for('home'))
+    flash('Result not found.', 'error')
+    return redirect(url_for('home'))
 
 
 
