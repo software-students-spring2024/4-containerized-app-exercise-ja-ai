@@ -9,7 +9,6 @@ black = "*"
 pymongo = "*"
 flask = "*"
 werkzeug = "*"
-pymongo = "*"
 api = "*"
 
 [dev-packages]
