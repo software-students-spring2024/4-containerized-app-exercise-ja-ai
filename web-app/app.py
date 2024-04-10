@@ -62,7 +62,7 @@ def process_images(app):
                         results_collection.insert_one({
                             "image_id": image_doc["image_id"],
                             "predicted_age":predicted_age,
-                            "gender":dominant_gender,
+                            # "gender":dominant_gender,
                             "actual_age":actual_age,
                             "upload_date": image_doc["upload_date"],
     
