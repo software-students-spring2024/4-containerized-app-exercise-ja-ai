@@ -1,20 +1,22 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from werkzeug.utils import secure_filename
-from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
-import gridfs
-from datetime import datetime
+import base64
+import os
+import sys
+import tempfile
 import threading
 import time
-import base64
-import tempfile
-import sys
-import os
-import bson
 from collections import Counter
+from datetime import datetime
+from flask import Flask, jsonify, flash, redirect, render_template, request, url_for
+import bson
+import gridfs
+from werkzeug.utils import secure_filename
+from pymongo import MongoClient, errors
 
-machine_learning_client_path = os.path.abspath('../machine-learning-client')
-sys.path.insert(0, machine_learning_client_path)
+
+MACHINE_LEARNING_CLIENT_PATH = os.path.abspath('../machine-learning-client')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+sys.path.insert(0, MACHINE_LEARNING_CLIENT_PATH)
 
 from api import analyze_image
 
@@ -32,10 +34,19 @@ results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=Tr
 
 
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    """
+    Checks if the uploaded file's extension is allowed
+    """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def process_images(app):
+    """
+    Continously check for and process pending images in the MongoDB
+    Each image is analyzed, and the results are updated in the database
+
+    Args:
+        app (Flask): The Flask application object for context
+    """
     with app.app_context():
         while True:
             image_doc = images_collection.find_one({"status": "pending"})
@@ -68,7 +79,7 @@ def process_images(app):
                             "upload_date": image_doc["upload_date"],
     
                         })
-                    except DuplicateKeyError:
+                    except errors.DuplicateKeyError:
                         print("Duplicate entry found, not inserting.")
                     fs.delete(image_doc['image_id'])
                     print(f"Processed and removed image: {image_doc['filename']} with results: {result}")
@@ -82,10 +93,20 @@ def process_images(app):
 
 @app.route('/', methods=['GET'])
 def home():
+    """
+    Brings to the homepage of the app
+    """
     return render_template('index.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
+    """
+    Upload endpoint for submitting images
+    Stores images in MongoDB and marks them as pending for processing
+
+    Returns:
+        Response: Redirects to processing page or re-renders upload form with error message
+    """
     if request.method == 'POST':
         if 'image' not in request.files:
             flash('No file part', 'error')
@@ -111,30 +132,22 @@ def upload_image():
 
 @app.route('/processing/<image_id>')
 def processing(image_id):
+    """
+    Brings you to the processing page
+
+    Returns:
+         Response: Redirects to processing page 
+    """
     return render_template('processing.html', image_id=image_id)
-
-@app.route('/age_data')
-def age_data():
-    results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
-    correct_count = 0
-    incorrect_count = 0
-
-    for result in results:
-        predicted_age = result["predicted_age"]
-        actual_age = int(result["actual_age"])  # Ensure actual ages are integers
-        if abs(predicted_age - actual_age) <= 1:
-            correct_count += 1
-        else:
-            incorrect_count += 1
-
-    aggregated_data = {
-        "correct": correct_count,
-        "incorrect": incorrect_count,
-    }
-    return jsonify(aggregated_data)
 
 @app.route('/age_comparison_data')
 def age_comparison_data():
+    """
+    Processes the data for the graph
+
+    Returns:
+        JSON of the data for the graph
+    """
     results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
     data = [
         {
@@ -144,28 +157,14 @@ def age_comparison_data():
     ]
     return jsonify(data)
 
-
-@app.route('/age_distribution')
-def age_distribution():
-    results = list(results_collection.find({}, {"actual_age": 1}))
-    actual_ages = [int(result["actual_age"]) for result in results]
-    
-    # Define your age bins
-    bins = range(0, 101, 10)  # Adjust bins as needed
-    bin_labels = [f"{bins[i]}-{bins[i+1]-1}" for i in range(len(bins)-1)]
-    age_distribution = Counter({label: 0 for label in bin_labels})  # Initialize counter with bins
-    
-    # Count the ages in each bin
-    for age in actual_ages:
-        for i in range(len(bins) - 1):
-            if bins[i] <= age < bins[i+1]:
-                age_distribution[bin_labels[i]] += 1
-                break
-
-    return jsonify(dict(age_distribution))
-
 @app.route('/check_status/<image_id>')
 def check_status(image_id):
+    """
+    Checks the status of the process
+
+    Returns:
+        JSON of the result
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
@@ -179,6 +178,12 @@ def check_status(image_id):
 
 @app.route('/results/<image_id>')
 def show_results(image_id):
+    """
+    Calls the results.html page
+
+    Returns:
+        Redirects: Redirects you to the results page if everything worked correctly, or to the homepage if there were errors
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
@@ -191,7 +196,7 @@ def show_results(image_id):
             fs_image = fs.get(image_id)
             image_data = base64.b64encode(fs_image.read()).decode('utf-8')
         except Exception as e:
-            flash('Error retrieving image data', 'error')
+            # flash('Error retrieving image data', 'error')
             print(f"Error retrieving image data: {e}")
             image_data = None
 
@@ -215,6 +220,9 @@ def show_results(image_id):
 
 
 if __name__ == '__main__':
+    """
+    Main methods
+    """
     processing_thread = threading.Thread(target=process_images, args=(app,))
     processing_thread.daemon = True
     processing_thread.start()
