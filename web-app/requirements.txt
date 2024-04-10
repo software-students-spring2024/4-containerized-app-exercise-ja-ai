@@ -1,4 +1,4 @@
-deepface
-Flask
+flask
+werkzeug
 pymongo
-tf_keras
+api
