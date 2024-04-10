@@ -7,20 +7,13 @@
     <style>
         .chart-container {
             display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
         }
         .chart-box {
-            flex: 1;
-            min-width: 300px;
-            max-width: 45%;
-            height: 400px;
-            margin: 10px;
+            width: 600px; /* Set a fixed width or as per your requirement */
+            height: 400px; /* Fixed height for the chart container */
             position: relative;
-            text-align: center; /* Centers the title */
-        }
-        .chart-title {
-            margin-bottom: 10px;
         }
         canvas {
             position: absolute;
@@ -34,99 +27,73 @@
 <body>
     <h2>Analysis Results</h2>
     
-    {% if results %}
-        <h3>Your Prediction</h3>
-        {% for result in results %}
-            <div>
-                <p>Predicted Age: {{ result.predicted_age }}</p>
-                <p>Actual Age: {{ result.actual_age }}</p>
-                <p>Status: {{ "Correct" if result.correct else "Incorrect" }}</p>
-            </div>
-        {% endfor %}
-    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
     
+    {% if result %}
+        <h3>Your Prediction</h3>
+        <div>
+            <p>Predicted Age: {{ result.predicted_age }}</p>
+            <p>Actual Age: {{ result.actual_age }}</p>
+            <p>Status: {{ "Correct" if result.is_correct else "Incorrect" }}</p>
+            {% if result.image_data %}
+                <img src="data:image/png;base64,{{ result.image_data }}" alt="Processed Image" />
+            {% endif %}
+        </div>
+    {% endif %}
+
     <div class="chart-container">
         <div class="chart-box">
-            <h3 class="chart-title">Model's Age Prediction Accuracy</h3>
-            <canvas id="accuracyChart"></canvas>
-        </div>
-        <div class="chart-box">
-            <h3 class="chart-title">Actual Age Distribution of Users</h3>
-            <canvas id="ageDistributionChart"></canvas>
+            <canvas id="ageComparisonChart"></canvas>
         </div>
     </div>
 
     <script>
-    // Fetch and render the model's prediction accuracy
-    fetch('/age_data')
+    fetch('/age_comparison_data')
         .then(response => response.json())
         .then(data => {
-            const accuracyData = [data.correct, data.incorrect];
-            
-            new Chart(document.getElementById('accuracyChart'), {
-                type: 'pie',
-                data: {
-                    labels: ['Correct Predictions', 'Incorrect Predictions'],
-                    datasets: [{
-                        label: 'Prediction Accuracy',
-                        data: accuracyData,
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.2)',
-                            'rgba(255, 99, 132, 0.2)'
-                        ],
-                        borderColor: [
-                            'rgba(75, 192, 192, 1)',
-                            'rgba(255, 99, 132, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                    }
-                }
-            });
-        });
+            const sampleIndices = data.map((_, index) => index);
+            const actualAges = data.map(item => item.actual_age);
+            const predictedAges = data.map(item => item.predicted_age);
 
-    // Fetch and render the actual age distribution chart
-    fetch('/age_distribution')
-        .then(response => response.json())
-        .then(data => {
-            const ageLabels = Object.keys(data);
-            const ageCounts = Object.values(data);
-            
-            new Chart(document.getElementById('ageDistributionChart'), {
-                type: 'bar',
+            new Chart(document.getElementById('ageComparisonChart'), {
+                type: 'line',
                 data: {
-                    labels: ageLabels,
+                    labels: sampleIndices,
                     datasets: [{
-                        label: 'Number of Users',
-                        data: ageCounts,
-                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                        borderColor: 'rgba(153, 102, 255, 1)',
-                        borderWidth: 1
+                        label: 'Actual Age',
+                        data: actualAges,
+                        borderColor: 'rgb(75, 192, 192)',
+                        borderWidth: 2,
+                        fill: false
+                    }, {
+                        label: 'Predicted Age',
+                        data: predictedAges,
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderWidth: 2,
+                        fill: false,
+                        borderDash: [5, 5]
                     }]
                 },
                 options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
                     scales: {
                         y: {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Number of Users'
+                                text: 'Age'
                             }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sample Index'
+                            }
                         }
                     }
                 }
