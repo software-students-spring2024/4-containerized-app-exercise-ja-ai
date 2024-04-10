@@ -250,26 +250,40 @@ def show_results(image_id):
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
-        return "Invalid image ID", 400
+        flash('Invalid image ID', 'error')
+        return redirect(url_for('home'))
+
     result = results_collection.find_one({"image_id": image_id}, {'_id': 0})
     if result:
         try:
             fs_image = fs.get(image_id)
-            result['image_data'] = base64.b64encode(fs_image.read()).decode('utf-8')
-        except:
-            result['image_data'] = None
+            image_data = base64.b64encode(fs_image.read()).decode('utf-8')
+        except Exception as e:
+            flash('Error retrieving image data', 'error')
+            print(f"Error retrieving image data: {e}")
+            image_data = None
 
-        # Calculate correctness here and add it to the result
         predicted_age = result.get('predicted_age')
         actual_age = int(result.get('actual_age', 0))  # Ensure actual_age is an integer
-        result['correct'] = abs(predicted_age - actual_age) <= 1
+        is_correct = abs(predicted_age - actual_age) <= 1
 
-        return render_template('results.html', results=[result])
+        # Include the 'image_data' and 'is_correct' in the result dictionary
+        result.update({
+            'image_data': image_data,
+            'is_correct': is_correct
+        })
+
+        # Pass the updated 'result' dictionary to the template
+        return render_template('results.html', result=result)
+
     else:
         flash('Result not found.', 'error')
         return redirect(url_for('home'))
 
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002, debug=True)
+if __name__ == '__main__':
+    processing_thread = threading.Thread(target=process_images, args=(app,))
+    processing_thread.daemon = True
+    processing_thread.start()
+    app.run(debug=True)
