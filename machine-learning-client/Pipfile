@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 pylint = "*"
 black = "*"
+tf-keras = "*"
+deepface = "*"
 
 [dev-packages]
 
