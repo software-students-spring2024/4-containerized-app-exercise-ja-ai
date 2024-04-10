@@ -70,7 +70,7 @@ def process_images(flask_app):
                     )
                     predicted_age = result[0]['age']
                     # gender_scores = result[0]['gender']
-                    # # dominant_gender = "Man" 
+                    # # dominant_gender = "Man"
                     # # if gender_scores["Man"] < gender_scores['Woman']:
                     # #     dominant_gender = "Woman"
                     actual_age = image_doc.get("actual_age")
@@ -89,8 +89,8 @@ def process_images(flask_app):
                         f"Processed and removed image: {image_doc['filename']} "
                         f"with results: {result}"
                     )
-                except:
-                    print(f"Error processing image {image_doc['filename']}")
+                except Exception as e:
+                    print(f"Error processing image {image_doc['filename']}: {e}")
             else:
                 print("No images to process.")
             time.sleep(5)
@@ -199,9 +199,9 @@ def show_results(image_id):
         try:
             fs_image = fs.get(image_id)
             image_data = base64.b64encode(fs_image.read()).decode('utf-8')
-        except:
+        except Exception as e:
             # flash('Error retrieving image data', 'error')
-            # print(f"Error retrieving image data: {e}")
+            print(f"Error retrieving image data: {e}")
             image_data = None
 
         predicted_age = result.get('predicted_age')
@@ -213,7 +213,6 @@ def show_results(image_id):
             'image_data': image_data,
             'is_correct': is_correct
         })
-
         # Pass the updated 'result' dictionary to the template
         return render_template('results.html', result=result)
     flash('Result not found.', 'error')
