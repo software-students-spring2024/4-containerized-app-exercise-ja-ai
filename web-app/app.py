@@ -11,6 +11,7 @@ import tempfile
 import sys
 import os
 import bson
+from collections import Counter
 
 machine_learning_client_path = os.path.abspath('../machine-learning-client')
 sys.path.insert(0, machine_learning_client_path)
@@ -112,6 +113,45 @@ def upload_image():
 def processing(image_id):
     return render_template('processing.html', image_id=image_id)
 
+@app.route('/age_data')
+def age_data():
+    results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
+    correct_count = 0
+    incorrect_count = 0
+
+    for result in results:
+        predicted_age = result["predicted_age"]
+        actual_age = int(result["actual_age"])  # Ensure actual ages are integers
+        if abs(predicted_age - actual_age) <= 1:
+            correct_count += 1
+        else:
+            incorrect_count += 1
+
+    aggregated_data = {
+        "correct": correct_count,
+        "incorrect": incorrect_count,
+    }
+    return jsonify(aggregated_data)
+
+@app.route('/age_distribution')
+def age_distribution():
+    results = list(results_collection.find({}, {"actual_age": 1}))
+    actual_ages = [int(result["actual_age"]) for result in results]
+    
+    # Define your age bins
+    bins = range(0, 101, 10)  # Adjust bins as needed
+    bin_labels = [f"{bins[i]}-{bins[i+1]-1}" for i in range(len(bins)-1)]
+    age_distribution = Counter({label: 0 for label in bin_labels})  # Initialize counter with bins
+    
+    # Count the ages in each bin
+    for age in actual_ages:
+        for i in range(len(bins) - 1):
+            if bins[i] <= age < bins[i+1]:
+                age_distribution[bin_labels[i]] += 1
+                break
+
+    return jsonify(dict(age_distribution))
+
 @app.route('/check_status/<image_id>')
 def check_status(image_id):
     try:
@@ -138,10 +178,17 @@ def show_results(image_id):
             result['image_data'] = base64.b64encode(fs_image.read()).decode('utf-8')
         except:
             result['image_data'] = None
+
+        # Calculate correctness here and add it to the result
+        predicted_age = result.get('predicted_age')
+        actual_age = int(result.get('actual_age', 0))  # Ensure actual_age is an integer
+        result['correct'] = abs(predicted_age - actual_age) <= 1
+
         return render_template('results.html', results=[result])
     else:
         flash('Result not found.', 'error')
         return redirect(url_for('home'))
+
 
 if __name__ == '__main__':
     processing_thread = threading.Thread(target=process_images, args=(app,))
