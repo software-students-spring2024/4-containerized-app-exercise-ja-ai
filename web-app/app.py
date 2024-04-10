@@ -11,14 +11,26 @@ import tempfile
 import sys
 import os
 import bson
+import cv2
 
 machine_learning_client_path = os.path.abspath('../machine-learning-client')
 sys.path.insert(0, machine_learning_client_path)
 
 from api import analyze_image
 
-app = Flask(__name__)
+global capture, record_frame, filename, photoPath
+capture = 0
+photoPath = "./shots"
+
+try:
+    os.mkdir('./shots')
+except OSError as error:
+    pass
+
+app = Flask(__name__, template_folder='./templates')
 app.secret_key = 'super_secret_key'
+
+camera = cv2.VideoCapture(0)
 
 # MongoDB connection
 client = MongoClient("mongodb://localhost:27017/")
@@ -29,10 +41,26 @@ images_collection = db["images_pending_processing"]
 results_collection = db["image_processing_results"]
 results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=True)
 
+def gen_frames():
+    globalcapture, record_frame
+    while True:
+        success, frame = camera.read()
+        if success:
+            if(capture):
+                capture = 0
+                now = datetime.datetime.now()
+                filename = os.path.sep.join(['shots', "shot_{}.png".format(str(now).replace(":",''))])
+                cv2.imwrite(p, frame)
 
-def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+            try:
+                ret, buffer = cv2.imencode('.jpg', cv2.flip(frame,1))
+                frame = buffer.tobyes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            except Exception as e:
+                pass
+        else:
+            pass
 
 def process_images(app):
     with app.app_context():
@@ -83,30 +111,42 @@ def process_images(app):
 def home():
     return render_template('index.html')
 
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/requests', methods=['GET', 'POST'])
+def tasks():
+    global camera
+    if request.method == 'POST':
+        if request.form.get('click') == 'Capture':
+            global capture
+            capture = 1
+
+    elif request.method == 'GET':
+        return render_template('index.html')
+
+    return render_template('index.html')
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
     if request.method == 'POST':
-        if 'image' not in request.files:
-            flash('No file part', 'error')
-            return redirect(request.url)
-        image = request.files['image']
-        if image.filename == '':
-            flash('No selected file', 'error')
-            return redirect(request.url)
-        if image and allowed_file(image.filename):
-            filename = secure_filename(image.filename)
-            image_id = fs.put(image, filename=filename)
-            actual_age = request.form.get("actual_age")
-            images_collection.insert_one({
-                'image_id': image_id,
-                'filename': filename,
-                'status': 'pending',
-                'upload_date': datetime.now(),
-                "actual_age":actual_age,
-            })
-            # flash('Image successfully uploaded and awaiting processing.', 'success')
-            return redirect(url_for('processing', image_id=str(image_id)))
-    return render_template('upload.html')
+        file_path = os.path.join(photosPath, filename)
+        image = cv2.imread(file_path)
+        image_id = fs.put(image, filename=filename)
+        actual_age = request.form.get("actual_age")
+        images_collection.insert_one({
+            'image_id': image_id,
+            'filename': filename,
+            'status': 'pending',
+            'upload_date': datetime.now(),
+            "actual_age":actual_age,
+        })
+        # flash('Image successfully uploaded and awaiting processing.', 'success')
+        return redirect(url_for('processing', image_id=str(image_id)))
+    
+    else:
+        return render_template('upload.html')
 
 @app.route('/processing/<image_id>')
 def processing(image_id):
@@ -148,3 +188,6 @@ if __name__ == '__main__':
     processing_thread.daemon = True
     processing_thread.start()
     app.run(debug=True)
+
+camera.release()
+cv2.destroyAllWindows()

@@ -5,9 +5,8 @@
 </head>
 <body>
     <h1>Upload Image for Age Estimation</h1>
+    <img src="{{ url_for('video_feed') }}" height="80%">
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <label for="image">Select image:</label>
-        <input type="file" id="image" name="image" required>
         <label for="actual_age">Your Actual Age:</label>
         <input type="number" id="actual_age" name="actual_age">
         <input type="submit" value="Upload">
