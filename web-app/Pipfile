@@ -9,6 +9,8 @@ black = "*"
 pymongo = "*"
 flask = "*"
 werkzeug = "*"
+bson = "*"
+gridfs = "*"
 api = "*"
 
 [dev-packages]
