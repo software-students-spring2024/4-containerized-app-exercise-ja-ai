@@ -35,6 +35,8 @@ camera = cv2.VideoCapture(0)
 capture_frame = None
 now = datetime.datetime.now()
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
 def gen_frames():
     global capture_frame
     while True:
