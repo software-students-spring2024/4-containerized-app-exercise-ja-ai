@@ -80,6 +80,23 @@ def capture():
             ensure_directory(shots_directory)  
             filepath = os.path.join(shots_directory, filename) 
             cv2.imwrite(filepath, capture_frame)  
+
+            # upload the captured image to MongoDB for use
+            with open(filepath, 'rb') as f:
+                image_id = fs.put(f, filename=filename)
+
+            # save image details for processing
+            actual_age = request.form.get("actual_age")
+            images_collection.insert_one({
+                'image_id': image_id,
+                'filename': filename,
+                'status': 'pending',
+                'upload_date': now,
+                'actual_age': actual_age,
+            })
+
+            # remove the captured file
+            # os.remove(filepath)
             # this returns to the index page (where user can upload photo)
             return redirect(url_for('index'))  
     return 'Error: Image capture failed.'
