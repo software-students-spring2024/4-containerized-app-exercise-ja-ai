@@ -50,7 +50,8 @@ def gen_frames():
         else:
             # Convert the frame to JPEG format
             ret, buffer = cv2.imencode('.jpg', frame)
-            capture_frame = frame  # Store the frame for capturing
+            # Store the frame for capturing
+            capture_frame = frame  
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
@@ -62,10 +63,11 @@ def index():
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# checking directory exists, else makes new one
 def ensure_directory(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
-        
+
 @app.route('/capture', methods=['POST'])
 def capture():
     global capture_frame
@@ -74,10 +76,12 @@ def capture():
             now = datetime.datetime.now()
             filename = f"captured_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
             shots_directory = './shots'
-            ensure_directory(shots_directory)  # Ensure shots directory exists
-            filepath = os.path.join(shots_directory, filename)  # Path to save the captured image
-            cv2.imwrite(filepath, capture_frame)  # Save the image using OpenCV
-            return redirect(url_for('index'))  # Redirect to the home page after capture
+            # creating shots directory (to save photos)
+            ensure_directory(shots_directory)  
+            filepath = os.path.join(shots_directory, filename) 
+            cv2.imwrite(filepath, capture_frame)  
+            # this returns to the index page (where user can upload photo)
+            return redirect(url_for('index'))  
     return 'Error: Image capture failed.'
 
 # End Camera Capture
