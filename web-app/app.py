@@ -9,12 +9,13 @@ import tempfile
 import threading
 import time
 from datetime import datetime
-from flask import Flask, jsonify, flash, redirect, render_template, request, url_for
+from flask import Flask, render_template, Response, request, redirect, url_for
 import bson
 import gridfs
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
-
+import cv2
+import datetime
 
 MACHINE_LEARNING_CLIENT_PATH = os.path.abspath('../machine-learning-client')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -35,6 +36,51 @@ images_collection = db["images_pending_processing"]
 results_collection = db["image_processing_results"]
 results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=True)
 
+# Image Capture
+camera = cv2.VideoCapture(0)
+capture_frame = None
+now = datetime.datetime.now()
+
+def gen_frames():
+    global capture_frame
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            # Convert the frame to JPEG format
+            ret, buffer = cv2.imencode('.jpg', frame)
+            capture_frame = frame  # Store the frame for capturing
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def ensure_directory(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+@app.route('/capture', methods=['POST'])
+def capture():
+    global capture_frame
+    if request.method == 'POST':
+        if capture_frame is not None:
+            now = datetime.datetime.now()
+            filename = f"captured_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+            shots_directory = './shots'
+            ensure_directory(shots_directory)  # Ensure shots directory exists
+            filepath = os.path.join(shots_directory, filename)  # Path to save the captured image
+            cv2.imwrite(filepath, capture_frame)  # Save the image using OpenCV
+            return redirect(url_for('index'))  # Redirect to the home page after capture
+    return 'Error: Image capture failed.'
+
+# End Camera Capture
 
 def allowed_file(filename):
     """
