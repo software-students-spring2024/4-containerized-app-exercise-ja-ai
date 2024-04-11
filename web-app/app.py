@@ -16,13 +16,7 @@ from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import cv2
 import datetime
-
-MACHINE_LEARNING_CLIENT_PATH = os.path.abspath('../machine-learning-client')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-sys.path.insert(0, MACHINE_LEARNING_CLIENT_PATH)
-
-from api import analyze_image
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key'
@@ -129,26 +123,22 @@ def process_images(flask_app):
                     with open(temp_filepath, 'wb') as f:
                         f.write(grid_out.read())
 
-                    result = analyze_image(temp_filepath)
+                    files = {'file': open(temp_filepath, 'rb')}
+                    response = requests.post('http://machine_learning_client:5001/analyze', files=files)
+                    result = response.json()
                     os.remove(temp_filepath)
 
-                    # Update the database with analysis results
                     images_collection.update_one(
                         {"_id": image_doc["_id"]},
                         {"$set": {"status": "processed"}}
                     )
-                    predicted_age = result[0]['age']
-                    # gender_scores = result[0]['gender']
-                    # # dominant_gender = "Man"
-                    # # if gender_scores["Man"] < gender_scores['Woman']:
-                    # #     dominant_gender = "Woman"
+                    predicted_age = result['age']
                     actual_age = image_doc.get("actual_age")
                     try:
                         results_collection.insert_one({
                             "image_id": image_doc["image_id"],
-                            "predicted_age":predicted_age,
-                            # "gender":dominant_gender,
-                            "actual_age":actual_age,
+                            "predicted_age": predicted_age,
+                            "actual_age": actual_age,
                             "upload_date": image_doc["upload_date"],
                         })
                     except errors.DuplicateKeyError:
