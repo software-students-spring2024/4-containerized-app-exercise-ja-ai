@@ -96,9 +96,11 @@ def capture():
             })
 
             # remove the captured file
+
             os.remove(filepath)
             # this returns to the index page (where user can upload photo)
             return redirect(url_for('processing', image_id=str(image_id)))  
+
     return 'Error: Image capture failed.'
 
 # End Camera Capture
@@ -195,6 +197,7 @@ def upload_image():
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             image_id = fs.put(image, filename=filename)
+            actual_age = request.form.get("actual_age")
             images_collection.insert_one({
                 'image_id': image_id,
                 'filename': filename,
@@ -225,6 +228,7 @@ def age_comparison_data():
         JSON of the data for the graph
     """
     results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
+
     data = []
     for result in results:
         actual_age = result.get("actual_age")
@@ -233,12 +237,6 @@ def age_comparison_data():
                 'actual_age': int(actual_age),
                 'predicted_age': result['predicted_age']
             })
-    # data = [
-    #     {
-    #         'actual_age': int(result["actual_age"]),
-    #         'predicted_age': result["predicted_age"]
-    #     } for result in results
-    # ]
     return jsonify(data)
 
 @app.route('/check_status/<image_id>')
@@ -290,6 +288,7 @@ def show_results(image_id):
         predicted_age = result.get('predicted_age')
         actual_age = int(result.get('actual_age', 0))  # Ensure actual_age is an integer
         is_correct = abs(predicted_age - actual_age) <= 2
+
 
         # Include the 'image_data' and 'is_correct' in the result dictionary
         result.update({
