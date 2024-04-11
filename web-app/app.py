@@ -10,6 +10,7 @@ import tempfile
 import sys
 import os
 import bson
+import requests
 
 machine_learning_client_path = os.path.abspath('../machine-learning-client')
 sys.path.insert(0, machine_learning_client_path)
@@ -42,7 +43,8 @@ def process_images(app):
                     with open(temp_filepath, 'wb') as f:
                         f.write(grid_out.read())
 
-                    result = analyze_image(temp_filepath)
+                    response = requests.post('http://machine_learning_client:5001/analyze', files={'file': open(temp_filepath, 'rb')})
+                    result = response.json()
                     os.remove(temp_filepath)
 
                     # Update the database with analysis results
