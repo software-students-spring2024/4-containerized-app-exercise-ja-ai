@@ -1,19 +1,26 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from werkzeug.utils import secure_filename
-from pymongo import MongoClient
-import gridfs
-from datetime import datetime
+"""
+Flask App
+"""
+
+import base64
+import os
+import sys
+import tempfile
 import threading
 import time
-import base64
-import tempfile
-import sys
-import os
+from datetime import datetime
+from flask import flash, Flask, jsonify, render_template, Response, request, redirect, url_for
 import bson
-import requests
+import gridfs
+from werkzeug.utils import secure_filename
+from pymongo import MongoClient, errors
+import cv2
+import datetime
 
-machine_learning_client_path = os.path.abspath('../machine-learning-client')
-sys.path.insert(0, machine_learning_client_path)
+MACHINE_LEARNING_CLIENT_PATH = os.path.abspath('../machine-learning-client')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+sys.path.insert(0, MACHINE_LEARNING_CLIENT_PATH)
 
 from api import analyze_image
 
@@ -27,13 +34,90 @@ fs = gridfs.GridFS(db)
 
 images_collection = db["images_pending_processing"]
 results_collection = db["image_processing_results"]
+results_collection.create_index([("image_id", 1), ("upload_date", 1)], unique=True)
+
+# Image Capture
+camera = cv2.VideoCapture(0)
+capture_frame = None
+now = datetime.datetime.now()
+
+def gen_frames():
+    global capture_frame
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            # Convert the frame to JPEG format
+            ret, buffer = cv2.imencode('.jpg', frame)
+            # Store the frame for capturing
+            capture_frame = frame  
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+# checking directory exists, else makes new one
+def ensure_directory(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+@app.route('/capture', methods=['POST'])
+def capture():
+    global capture_frame
+    if request.method == 'POST':
+        if capture_frame is not None:
+            now = datetime.datetime.now()
+            filename = f"captured_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+            shots_directory = './shots'
+            # creating shots directory (to save photos)
+            ensure_directory(shots_directory)  
+            filepath = os.path.join(shots_directory, filename) 
+            cv2.imwrite(filepath, capture_frame)  
+
+            # upload the captured image to MongoDB for use
+            with open(filepath, 'rb') as f:
+                image_id = fs.put(f, filename=filename)
+
+            # save image details for processing
+            actual_age = request.form.get("actual_age")
+            images_collection.insert_one({
+                'image_id': image_id,
+                'filename': filename,
+                'status': 'pending',
+                'upload_date': now,
+                'actual_age': actual_age,
+            })
+
+            # remove the captured file
+            os.remove(filepath)
+            # this returns to the index page (where user can upload photo)
+            return redirect(url_for('processing', image_id=str(image_id)))  
+    return 'Error: Image capture failed.'
+
+# End Camera Capture
 
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    """
+    Checks if the uploaded file's extension is allowed
+    """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def process_images(app):
-    with app.app_context():
+def process_images(flask_app):
+    """
+    Continously check for and process pending images in the MongoDB
+    Each image is analyzed, and the results are updated in the database
+
+    Args:
+        app (Flask): The Flask application object for context
+    """
+    with flask_app.app_context():
         while True:
             image_doc = images_collection.find_one({"status": "pending"})
             if image_doc:
@@ -43,8 +127,7 @@ def process_images(app):
                     with open(temp_filepath, 'wb') as f:
                         f.write(grid_out.read())
 
-                    response = requests.post('http://machine_learning_client:5001/analyze', files={'file': open(temp_filepath, 'rb')})
-                    result = response.json()
+                    result = analyze_image(temp_filepath)
                     os.remove(temp_filepath)
 
                     # Update the database with analysis results
@@ -52,28 +135,56 @@ def process_images(app):
                         {"_id": image_doc["_id"]},
                         {"$set": {"status": "processed"}}
                     )
-                    result_id = results_collection.insert_one({
-                        "image_id": image_doc["image_id"],
-                        "filename": image_doc["filename"],
-                        "analysis": result,  # Save the analysis results in the database
-                        "upload_date": image_doc["upload_date"]
-                    }).inserted_id
-                    print(f"Processed image: {image_doc['filename']} with results: {result}")
-
+                    predicted_age = result[0]['age']
+                    # gender_scores = result[0]['gender']
+                    # # dominant_gender = "Man"
+                    # # if gender_scores["Man"] < gender_scores['Woman']:
+                    # #     dominant_gender = "Woman"
+                    actual_age = image_doc.get("actual_age")
+                    try:
+                        results_collection.insert_one({
+                            "image_id": image_doc["image_id"],
+                            "predicted_age":predicted_age,
+                            # "gender":dominant_gender,
+                            "actual_age":actual_age,
+                            "upload_date": image_doc["upload_date"],
+                        })
+                    except errors.DuplicateKeyError:
+                        print("Duplicate entry found, not inserting.")
+                    fs.delete(image_doc['image_id'])
+                    print(
+                        f"Processed and removed image: {image_doc['filename']} "
+                        f"with results: {result}"
+                    )
                 except Exception as e:
                     print(f"Error processing image {image_doc['filename']}: {e}")
             else:
                 print("No images to process.")
             time.sleep(5)
 
-
 @app.route('/', methods=['GET'])
 def home():
+    """
+    Brings to the homepage of the app
+    """
     return render_template('index.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
+    """
+    Upload endpoint for submitting images
+    Stores images in MongoDB and marks them as pending for processing
+
+    Returns:
+        Response: Redirects to processing page or re-renders upload form with error message
+    """
     if request.method == 'POST':
+        action = request.form.get('action')
+        actual_age = request.form.get("actual_age")
+
+        if action == 'capture':
+            return capture()
+
         if 'image' not in request.files:
             flash('No file part', 'error')
             return redirect(request.url)
@@ -89,44 +200,108 @@ def upload_image():
                 'filename': filename,
                 'status': 'pending',
                 'upload_date': datetime.now(),
+                "actual_age":actual_age,
             })
-            flash('Image successfully uploaded and awaiting processing.', 'success')
+            # flash('Image successfully uploaded and awaiting processing.', 'success')
             return redirect(url_for('processing', image_id=str(image_id)))
-    return render_template('upload.html')
+    return render_template('index.html')
 
 @app.route('/processing/<image_id>')
 def processing(image_id):
+    """
+    Brings you to the processing page
+
+    Returns:
+         Response: Redirects to processing page 
+    """
     return render_template('processing.html', image_id=image_id)
+
+@app.route('/age_comparison_data')
+def age_comparison_data():
+    """
+    Processes the data for the graph
+
+    Returns:
+        JSON of the data for the graph
+    """
+    results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
+    data = []
+    for result in results:
+        actual_age = result.get("actual_age")
+        if actual_age is not None:
+            data.append({
+                'actual_age': int(actual_age),
+                'predicted_age': result['predicted_age']
+            })
+    # data = [
+    #     {
+    #         'actual_age': int(result["actual_age"]),
+    #         'predicted_age': result["predicted_age"]
+    #     } for result in results
+    # ]
+    return jsonify(data)
 
 @app.route('/check_status/<image_id>')
 def check_status(image_id):
+    """
+    Checks the status of the process
+
+    Returns:
+        JSON of the result
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
         return jsonify({'status': 'error', 'message': 'Invalid image ID'}), 400
     image_doc = images_collection.find_one({'image_id': image_id})
     if image_doc and image_doc['status'] == 'processed':
+        images_collection.delete_one({"_id": image_doc['_id']})
         return jsonify({'status': 'processed', 'image_id': str(image_id)})
-    else:
-        return jsonify({'status': 'pending'})
+    return jsonify({'status': 'pending'})
 
 @app.route('/results/<image_id>')
 def show_results(image_id):
+    """
+    Calls the results.html page
+
+    Returns:
+        Redirects: Redirects you to the results page if everything worked 
+                    correctly, or to the homepage if there were errors
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
-        return "Invalid image ID", 400
+        flash('Invalid image ID', 'error')
+        return redirect(url_for('home'))
+
     result = results_collection.find_one({"image_id": image_id}, {'_id': 0})
     if result:
         try:
             fs_image = fs.get(image_id)
-            result['image_data'] = base64.b64encode(fs_image.read()).decode('utf-8')
-        except:
-            result['image_data'] = None
-        return render_template('results.html', results=[result], filename=result['filename'])
-    else:
-        flash('Result not found.', 'error')
-        return redirect(url_for('home'))
+            image_data = base64.b64encode(fs_image.read()).decode('utf-8')
+        except gridfs.errors.NoFile:
+            # flash("No file found in database.", 'error')
+            image_data = None
+        except Exception as e:
+            flash('Error retrieving image data: {e}', 'error')
+            # print(f"Error retrieving image data: {e}")
+            image_data = None
+
+        predicted_age = result.get('predicted_age')
+        actual_age = int(result.get('actual_age', 0))  # Ensure actual_age is an integer
+        is_correct = abs(predicted_age - actual_age) <= 2
+
+        # Include the 'image_data' and 'is_correct' in the result dictionary
+        result.update({
+            'image_data': image_data,
+            'is_correct': is_correct
+        })
+        # Pass the updated 'result' dictionary to the template
+        return render_template('results.html', result=result)
+    flash('Result not found.', 'error')
+    return redirect(url_for('home'))
+
+
 
 if __name__ == '__main__':
     processing_thread = threading.Thread(target=process_images, args=(app,))
