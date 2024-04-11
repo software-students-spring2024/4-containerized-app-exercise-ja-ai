@@ -3,29 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <title>Analysis Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .chart-box {
+            width: 600px; /* Set a fixed width or as per your requirement */
+            height: 400px; /* Fixed height for the chart container */
+            position: relative;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+    </style>
 </head>
 <body>
     <h2>Analysis Results</h2>
     
-    <!-- Display flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="flash-{{ category }}">{{ message }}</div>
+                <div class="alert alert-{{ category }}">{{ message }}</div>
             {% endfor %}
         {% endif %}
     {% endwith %}
     
-    {% for result in results %}
+    {% if result %}
         <div>
-            <h3>{{ result.filename }}</h3>
-            {% for analysis in result.analysis %}
-                <p>Age: {{ analysis.age }}</p>
-                <p>Gender: {{ analysis.dominant_gender }}</p>
-                <p>Confidence: {{ analysis.face_confidence }}</p>
-                <hr>
-            {% endfor %}
+            <p>Predicted Age: {{ result.predicted_age }}</p>
+            <p>Actual Age: {{ result.actual_age }}</p>
+            <p>Status: {{ "Correct" if result.is_correct else "Incorrect" }}</p>
+            {% if result.image_data %}
+                <img src="data:image/png;base64,{{ result.image_data }}" alt="Processed Image" />
+            {% endif %}
         </div>
-    {% endfor %}
+    {% endif %}
+
+    <div class="chart-container">
+        <div class="chart-box">
+            <canvas id="ageComparisonChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+    fetch('/age_comparison_data')
+        .then(response => response.json())
+        .then(data => {
+            const sampleIndices = data.map((_, index) => index);
+            const actualAges = data.map(item => item.actual_age);
+            const predictedAges = data.map(item => item.predicted_age);
+
+            new Chart(document.getElementById('ageComparisonChart'), {
+                type: 'line',
+                data: {
+                    labels: sampleIndices,
+                    datasets: [{
+                        label: 'Actual Age',
+                        data: actualAges,
+                        borderColor: 'rgb(75, 192, 192)',
+                        borderWidth: 2,
+                        fill: false
+                    }, {
+                        label: 'Predicted Age',
+                        data: predictedAges,
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderWidth: 2,
+                        fill: false,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Age'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sample Index'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
