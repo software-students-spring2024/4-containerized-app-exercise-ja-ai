@@ -8,21 +8,27 @@
     <h1>Welcome to the Age Estimation App</h1>
     
     <!-- Instructions for users -->
-    <p>Please upload your image to estimate your age</p>
+    <p>Please upload your image or capture it using the camera to estimate your age.</p>
 
     <!-- Camera Feed -->
-    <h1>Camera Feed</h1>
-
+    <h2>Camera Feed</h2>
     <!-- Display the live camera feed -->
     <img src="{{ url_for('video_feed') }}" width="640" height="480">
 
-    <!-- Capture an image -->
-    <form action="/capture" method="post">
-        <button type="submit">Capture Image</button>
-    </form>
-    <!-- Link to the upload page -->
-    <a href="{{ url_for('upload_image') }}">Upload Image</a>
+    <!-- Form to upload or capture image -->
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <!-- Capture an image -->
+        <button type="submit" formaction="/capture" name="action" value="capture">Capture Image</button>
 
+        <!-- Enter your actual age-->
+        <label for="actual_age">Your Actual Age:</label>
+        <input type="number" id="actual_age" name="actual_age" required>
+        
+        
+        <!-- Upload the selected image
+        <input type="submit" value="Upload Image" name="action" value="upload"> -->
+    </form>
+    
     <!-- Display flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
