@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.secret_key = 'super_secret_key'
 
 # MongoDB connection
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mongodb://mongodb:27017/")
 db = client["faces"]
 fs = gridfs.GridFS(db)
 
