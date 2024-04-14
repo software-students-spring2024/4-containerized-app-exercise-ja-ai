@@ -3,8 +3,9 @@ API module for image analysis using the DeepFace library.
 This module provides functionalities to analyze images for age.
 """
 
-from deepface import DeepFace
 import logging
+from deepface import DeepFace
+
 logging.basicConfig(level=logging.INFO)
 
 def analyze_image(img_path):
@@ -21,7 +22,7 @@ def analyze_image(img_path):
         logging.info("Analyzing the image at path: %s", img_path)
         result = DeepFace.analyze(img_path=img_path, actions=['age', 'gender'])
         logging.info("Analysis result: %s", result)
-        return [result['age'], result['gender']]
+        return [result[0]['age'], result[0]['gender']]
     except Exception as e:
         logging.error("An error occurred during image analysis: %s", e)
         raise

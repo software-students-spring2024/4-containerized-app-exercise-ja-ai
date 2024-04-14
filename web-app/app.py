@@ -5,15 +5,15 @@ Flask App for uploading and processing images.
 import base64
 import os
 import tempfile
-import threading
-import time
+# import threading
+# import time
 import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
-import werkzeug
+# import werkzeug
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import requests
@@ -92,10 +92,10 @@ def upload_image():
             except errors.PyMongoError as e:
                 app.logger.error("Error saving file to database: %s", e)
                 flash("Error saving file to database.", "error")
-            except Exception as e:
-                app.logger.error("An unexpected error occurred: %s", e)
-                traceback.print_exc()
-                flash("An unexpected error occurred while uploading the file.", "error")
+            # except Exception as e:
+            #     app.logger.error("An unexpected error occurred: %s", e)
+            #     traceback.print_exc()
+            #     flash("An unexpected error occurred while uploading the file.", "error")
         flash("Invalid file type.", "error")
         # Redirect to home only if it's a POST request and something goes wrong
         return redirect(url_for("home"))
@@ -119,11 +119,19 @@ def processing(image_id):
     try:
         process_image(image_id)
         return redirect(url_for("show_results", image_id=image_id))
-    except Exception as e:
-        app.logger.error("Error occurred during image processing: %s", e)
-        traceback.print_exc()
-        flash("An error occurred while processing the image.", "error")
-        return redirect(url_for("home"))
+    except errors.PyMongoError as e:
+        app.logger.error("Database error during image processing: %s", e)
+        flash("A database error occurred while processing the image.", "error")
+    except requests.exceptions.RequestException as e:
+        app.logger.error("HTTP request error during image processing: %s", e)
+        flash("A network error occurred while processing the image.", "error")
+    except OSError as e:
+        app.logger.error("File handling error during image processing: %s", e)
+        flash("A file handling error occurred while processing the image.", "error")
+    # except Exception as e:
+    #     app.logger.error("An unexpected error occurred during image processing: %s", e)
+    #     flash("An unexpected error occurred while processing the image.", "error")
+    return redirect(url_for("home"))
 
 
 def process_image(image_id):
@@ -188,7 +196,15 @@ def process_image(image_id):
             "Result inserted into results_collection with ID: %s",
             insert_result.inserted_id
        )
-    except Exception as e:
+    except gridfs.errors.NoFile as e:
+        app.logger.error("GridFS file not found: %s", e)
+    except errors.PyMongoError as e:
+        app.logger.error("MongoDB operation failed: %s", e)
+    except requests.exceptions.RequestException as e:
+        app.logger.error("Request failed: %s", e)
+    except OSError as e:
+        app.logger.error("OS error during file handling: %s", e)
+    finally:
         app.logger.error("Error processing image %s: %s", image_id, e)
         traceback.print_exc()
         # Set status to "failed" to indicate processing did not complete
@@ -237,8 +253,14 @@ def show_results(image_id):
             result["image_data"] = base64.b64encode(fs_image.read()).decode("utf-8")
             # Assuming `result["analysis"]` contains "age" and "gender"
             result.update(result["analysis"])
-        except Exception as e:
-            flash(f"Result not found or error loading image. {e}", "error")
+        except gridfs.errors.NoFile:
+            flash("File not found in database.", "error")
+            return redirect(url_for("home"))
+        except KeyError as e:
+            flash(f"Key error in result analysis: {str(e)}", "error")
+            return redirect(url_for("home"))
+        except gridfs.errors.GridFSError as e:
+            flash(f"Error accessing file in GridFS: {str(e)}", "error")
             return redirect(url_for("home"))
         return render_template("results.html", result=result, filename=result["filename"])
     flash("Result not found.", "error")
