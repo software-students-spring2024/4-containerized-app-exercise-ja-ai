@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+
+  machine-learning-client:
+    build:
+      context: ./machine-learning-client
+      dockerfile: Dockerfile
+    depends_on:
+      - mongodb
+    ports:
+      - "5001:5001"
+    networks:
+      - app-network
+
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+    depends_on:
+      - machine-learning-client
+      - mongodb
+    ports:
+      - "5002:5000"
+    networks:
+      - app-network
+    
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
