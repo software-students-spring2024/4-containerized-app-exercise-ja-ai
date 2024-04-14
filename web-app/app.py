@@ -31,6 +31,7 @@ results_collection = db["image_processing_results"]
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+
 def allowed_file(filename):
     """
     Function that makes sure the uploaded picture file is in the allowed extensions
@@ -39,6 +40,7 @@ def allowed_file(filename):
         A boolean
     """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def process_images(my_app):
     """
@@ -89,6 +91,7 @@ def home():
     """
     return render_template('index.html')
 
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
     """
@@ -128,6 +131,7 @@ def upload_image():
         #     return redirect(url_for('home'))
     return render_template('upload.html')
 
+
 @app.route('/processing/<image_id>')
 def processing(image_id):
     """
@@ -137,6 +141,7 @@ def processing(image_id):
         The processing.html page
     """
     return render_template('processing.html', image_id=image_id)
+
 
 @app.route('/check_status/<image_id>')
 def check_status(image_id):
@@ -154,6 +159,7 @@ def check_status(image_id):
     if image_doc and image_doc['status'] == 'processed':
         return jsonify({'status': 'processed', 'image_id': str(image_id)})
     return jsonify({'status': 'pending'})
+
 
 @app.route('/results/<image_id>')
 def show_results(image_id):
@@ -181,6 +187,7 @@ def show_results(image_id):
         return render_template('results.html', results=[result], filename=result['filename'])
     flash('Result not found.', 'error')
     return redirect(url_for('home'))
+
 
 if __name__ == '__main__':
     processing_thread = threading.Thread(target=process_images, args=(app,))
