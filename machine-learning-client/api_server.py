@@ -1,12 +1,14 @@
 """
 API Server
 """
+
 import os
 from flask import Flask, request, jsonify
 from api import analyze_image
 
 
 app = Flask(__name__)
+
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
@@ -28,6 +30,7 @@ def analyze():
         os.remove(path)
         return jsonify(result)
     return jsonify({"error": "Unknown error"}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)
