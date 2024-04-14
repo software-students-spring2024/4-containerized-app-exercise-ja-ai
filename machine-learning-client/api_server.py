@@ -8,7 +8,7 @@ from api import analyze_image
 
 app = Flask(__name__)
 
-@app.route('/analyze', methods=['POST'])
+@app.route("/analyze", methods=["POST"])
 def analyze():
     """
     Method to communicate between the web-app and the machine learning client
