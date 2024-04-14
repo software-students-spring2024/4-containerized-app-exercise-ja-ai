@@ -5,15 +5,17 @@ Flask App for uploading and processing images.
 import base64
 import os
 import tempfile
-import threading
-import time
+
+# import threading
+# import time
 import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
-import werkzeug
+
+# import werkzeug
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import requests
@@ -80,22 +82,22 @@ def upload_image():
             try:
                 image_id = fs.put(image, filename=filename)
                 images_collection.insert_one(
-                  {
-                    "image_id": image_id,
-                    "filename": filename,
-                    "status": "pending",
-                    "upload_date": datetime.now(),
-                  }
+                    {
+                        "image_id": image_id,
+                        "filename": filename,
+                        "status": "pending",
+                        "upload_date": datetime.now(),
+                    }
                 )
                 start_processing(str(image_id))
                 return redirect(url_for("processing", image_id=str(image_id)))
             except errors.PyMongoError as e:
                 app.logger.error("Error saving file to database: %s", e)
                 flash("Error saving file to database.", "error")
-            except Exception as e:
-                app.logger.error("An unexpected error occurred: %s", e)
-                traceback.print_exc()
-                flash("An unexpected error occurred while uploading the file.", "error")
+            # except Exception as e:
+            #     app.logger.error("An unexpected error occurred: %s", e)
+            #     traceback.print_exc()
+            #     flash("An unexpected error occurred while uploading the file.", "error")
         flash("Invalid file type.", "error")
         # Redirect to home only if it's a POST request and something goes wrong
         return redirect(url_for("home"))
@@ -119,11 +121,19 @@ def processing(image_id):
     try:
         process_image(image_id)
         return redirect(url_for("show_results", image_id=image_id))
-    except Exception as e:
-        app.logger.error("Error occurred during image processing: %s", e)
-        traceback.print_exc()
-        flash("An error occurred while processing the image.", "error")
-        return redirect(url_for("home"))
+    except errors.PyMongoError as e:
+        app.logger.error("Database error during image processing: %s", e)
+        flash("A database error occurred while processing the image.", "error")
+    except requests.exceptions.RequestException as e:
+        app.logger.error("HTTP request error during image processing: %s", e)
+        flash("A network error occurred while processing the image.", "error")
+    except OSError as e:
+        app.logger.error("File handling error during image processing: %s", e)
+        flash("A file handling error occurred while processing the image.", "error")
+    # except Exception as e:
+    #     app.logger.error("An unexpected error occurred during image processing: %s", e)
+    #     flash("An unexpected error occurred while processing the image.", "error")
+    return redirect(url_for("home"))
 
 
 def process_image(image_id):
@@ -141,7 +151,9 @@ def process_image(image_id):
         app.logger.error("No image found for image ID: %s", image_id)
         return
     if image_doc["status"] != "pending":
-        app.logger.error("Image is not pending, current status is: %s", image_doc['status'])
+        app.logger.error(
+            "Image is not pending, current status is: %s", image_doc["status"]
+        )
         return
     # Proceed with processing
     try:
@@ -167,45 +179,49 @@ def process_image(image_id):
 
         # Update the database with the analysis results
         update_result = images_collection.update_one(
-            {"_id": image_doc["_id"]},
-            {"$set": {"status": "processed"}}
+            {"_id": image_doc["_id"]}, {"$set": {"status": "processed"}}
         )
         app.logger.info(
-          "Image status updated in images_collection. Modified count: %s", 
-          update_result.modified_count
+            "Image status updated in images_collection. Modified count: %s",
+            update_result.modified_count,
         )
 
         # Insert the result into the results_collection
         insert_result = results_collection.insert_one(
-          {
-            "image_id": image_doc["image_id"],
-            "filename": image_doc["filename"],
-            "analysis": result,
-            "upload_date": image_doc["upload_date"]
-          }
+            {
+                "image_id": image_doc["image_id"],
+                "filename": image_doc["filename"],
+                "analysis": result,
+                "upload_date": image_doc["upload_date"],
+            }
         )
         app.logger.info(
             "Result inserted into results_collection with ID: %s",
-            insert_result.inserted_id
-       )
-    except Exception as e:
+            insert_result.inserted_id,
+        )
+    except gridfs.errors.NoFile as e:
+        app.logger.error("GridFS file not found: %s", e)
+    except errors.PyMongoError as e:
+        app.logger.error("MongoDB operation failed: %s", e)
+    except requests.exceptions.RequestException as e:
+        app.logger.error("Request failed: %s", e)
+    except OSError as e:
+        app.logger.error("OS error during file handling: %s", e)
+    finally:
         app.logger.error("Error processing image %s: %s", image_id, e)
         traceback.print_exc()
         # Set status to "failed" to indicate processing did not complete
         images_collection.update_one(
-            {"_id": bson.ObjectId(image_id)},
-            {"$set": {"status": "failed"}}
+            {"_id": bson.ObjectId(image_id)}, {"$set": {"status": "failed"}}
         )
-        app.logger.info(
-            "Image status updated to 'failed' for image ID: %s", image_id
-        )
+        app.logger.info("Image status updated to 'failed' for image ID: %s", image_id)
 
 
 @app.route("/check_status/<image_id>")
 def check_status(image_id):
     """
     Function that checks the status of the images being processed
-    
+
     Returns:
         A JSON of the result
     """
@@ -228,8 +244,8 @@ def show_results(image_id):
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
-        flash('Invalid image ID.', 'error')
-        return redirect(url_for('home'))
+        flash("Invalid image ID.", "error")
+        return redirect(url_for("home"))
     result = results_collection.find_one({"image_id": image_id}, {"_id": 0})
     if result:
         try:
@@ -237,12 +253,21 @@ def show_results(image_id):
             result["image_data"] = base64.b64encode(fs_image.read()).decode("utf-8")
             # Assuming `result["analysis"]` contains "age" and "gender"
             result.update(result["analysis"])
-        except Exception as e:
-            flash(f"Result not found or error loading image. {e}", "error")
+        except gridfs.errors.NoFile:
+            flash("File not found in database.", "error")
             return redirect(url_for("home"))
-        return render_template("results.html", result=result, filename=result["filename"])
+        except KeyError as e:
+            flash(f"Key error in result analysis: {str(e)}", "error")
+            return redirect(url_for("home"))
+        except gridfs.errors.GridFSError as e:
+            flash(f"Error accessing file in GridFS: {str(e)}", "error")
+            return redirect(url_for("home"))
+        return render_template(
+            "results.html", result=result, filename=result["filename"]
+        )
     flash("Result not found.", "error")
     return redirect(url_for("home"))
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5002, debug=True)
