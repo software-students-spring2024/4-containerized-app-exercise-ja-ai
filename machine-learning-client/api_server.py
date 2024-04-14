@@ -1,29 +1,35 @@
 """
-API module for image analysis using the DeepFace library.
-This module provides functionalities to analyze images for age.
+ API Server
 """
 
-import logging
-from deepface import DeepFace
+import os
+from flask import Flask, request, jsonify
+from api import analyze_image
 
-logging.basicConfig(level=logging.INFO)
+
+app = Flask(__name__)
 
 
-def analyze_image(img_path):
-    """
-    Analyze an image for age and gender using DeepFace.
+@app.route("/analyze", methods=["POST"])
+def analyze():
+     """
+     Method to communicate between the web-app and the machine learning client
+     Returns:
+         A JSON of the result
+     """
+     if "file" not in request.files:
+         return jsonify({"error": "No file part"}), 400
+     file = request.files["file"]
+     if file.filename == "":
+         return jsonify({"error": "No selected file"}), 400
+     if file:
+         path = os.path.join("/tmp", file.filename)
+         file.save(path)
+         result = analyze_image(path)
+         os.remove(path)
+         return jsonify(result)
+     return jsonify({"error": "Unknown error"}), 500
 
-    Parameters:
-        img_path (str): Path to the image file
 
-    Returns:
-        list: Analysis results including age and gender
-    """
-    try:
-        logging.info("Analyzing the image at path: %s", img_path)
-        result = DeepFace.analyze(img_path=img_path, actions=["age", "gender"])
-        logging.info("Analysis result: %s", result)
-        return [result[0]["age"], result[0]["gender"]]
-    except Exception as e:
-        logging.error("An error occurred during image analysis: %s", e)
-        raise
+if __name__ == "__main__":
+     app.run(host="0.0.0.0", port=5001, debug=True)

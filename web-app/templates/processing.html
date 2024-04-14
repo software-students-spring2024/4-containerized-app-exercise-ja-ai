@@ -6,7 +6,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
         function checkStatus() {
-            var imageId = "{{ image_id }}";
+            var imageId = "{{ image_id }}";  // Ensure that image_id is passed correctly from the server
             $.getJSON("/check_status/" + imageId, function(data) {
                 if (data.status === "processed") {
                     window.location.href = "/results/" + imageId;
