@@ -5,6 +5,7 @@ This module provides functionalities to analyze images for age.
 
 from deepface import DeepFace
 
+
 def analyze_image(img_path):
     """
     Analyze an image for age and gender using DeepFace.
