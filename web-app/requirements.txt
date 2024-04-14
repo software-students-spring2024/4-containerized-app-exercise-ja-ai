@@ -3,3 +3,4 @@ werkzeug
 pymongo
 requests
 python-dotenv
+pylint
