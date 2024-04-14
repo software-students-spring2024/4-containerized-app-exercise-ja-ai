@@ -2,4 +2,4 @@ flask
 werkzeug
 pymongo
 requests
-opencv-python
+cv2
