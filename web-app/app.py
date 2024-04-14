@@ -59,9 +59,10 @@ def process_images(my_app):
                     with open(temp_filepath, "wb") as f:
                         f.write(grid_out.read())
                     with open(temp_filepath, "rb") as file:
-                        response = requests.post("http://machine_learning_client:5001/analyze",
-                                                files={"file":file},
-                                                timeout=10)
+                        response = requests.post(
+                            "http://machine_learning_client:5001/analyze",
+                            files={"file":file},
+                            timeout=10)
                     result = response.json()
                     os.remove(temp_filepath)
                     # Update the database with analysis results
@@ -73,7 +74,7 @@ def process_images(my_app):
                             "image_id": image_doc["image_id"],
                             "filename": image_doc["filename"],
                             "analysis": result,  # Save the analysis results in the database
-                            "upload_date": image_doc["upload_date"]
+                            "upload_date": image_doc["upload_date"],
                         }
                     ).inserted_id
                     print(rc)
@@ -141,7 +142,7 @@ def upload_image():
 def processing(image_id):
     """
     Function
-    
+
     Returns:
         The processing.html page
     """
@@ -159,7 +160,7 @@ def check_status(image_id):
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
-        return jsonify({"status":"error", "message":"Invalid image ID"}), 400
+        return jsonify({"status":"error", "message": "Invalid image ID"}), 400
     image_doc = images_collection.find_one({"image_id": image_id})
     if image_doc and image_doc["status"] == "processed":
         return jsonify({"status": "processed", "image_id": str(image_id)})
@@ -189,7 +190,9 @@ def show_results(image_id):
         except gridfs.errors.GridFSError as e:
             print(f"Error retrieving image {image_id}: {e}")
             result["image_data"] = None
-        return render_template("results.html", results=[result], filename=result["filename"])
+        return render_template(
+            "results.html", results=[result], filename=result["filename"]
+        )
     flash("Result not found.", "error")
     return redirect(url_for("home"))
 
