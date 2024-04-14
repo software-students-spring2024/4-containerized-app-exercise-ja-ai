@@ -1,15 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from werkzeug.utils import secure_filename
-from pymongo import MongoClient
-import gridfs
-from datetime import datetime
+"""
+Flask App
+"""
+import base64
+import os
+import sys
+import tempfile
 import threading
 import time
-import base64
-import tempfile
-import sys
-import os
+from datetime import datetime
+from flask import flash, Flask, jsonify, render_template, Response, request, redirect, url_for
 import bson
+import gridfs
+from werkzeug.utils import secure_filename
+from pymongo import MongoClient, errors
+import cv2
+import datetime
 import requests
 
 app = Flask(__name__)
