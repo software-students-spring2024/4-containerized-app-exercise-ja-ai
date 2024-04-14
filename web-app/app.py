@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime
+from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, Response, request, redirect, url_for
 import bson
 import gridfs
@@ -15,8 +16,10 @@ from pymongo import MongoClient, errors
 import datetime
 import requests
 
+load_dotenv()
+
 app = Flask(__name__)
-app.secret_key = 'super_secret_key'
+app.secret_key = os.getenv("SECRET_KEY")
 
 # MongoDB connection
 client = MongoClient("mongodb://localhost:27017/")
