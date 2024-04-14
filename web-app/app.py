@@ -17,8 +17,7 @@ import werkzeug
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import requests
-import os
-import tempfile
+
 
 load_dotenv()
 
@@ -62,6 +61,12 @@ def home():
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload_image():
+    """
+    Function to upload the image to be processed
+
+    Returns:
+        The processing.html page
+    """
     if request.method == "POST":
         if "image" not in request.files:
             flash("No file part", "error")
@@ -85,10 +90,10 @@ def upload_image():
                 start_processing(str(image_id))
                 return redirect(url_for("processing", image_id=str(image_id)))
             except errors.PyMongoError as e:
-                app.logger.error("Error saving file to database: {}".format(e))
+                app.logger.error("Error saving file to database: %s", e)
                 flash("Error saving file to database.", "error")
             except Exception as e:
-                app.logger.error("An unexpected error occurred: {}".format(e))
+                app.logger.error("An unexpected error occurred: %s", e)
                 traceback.print_exc()
                 flash("An unexpected error occurred while uploading the file.", "error")
         flash("Invalid file type.", "error")
@@ -97,36 +102,46 @@ def upload_image():
     # Render the upload form template for GET request
     return render_template("upload.html")
 
-  
+
 def start_processing(image_id):
-    # This function would ideally start a background job to process the image
-    # For simplicity here, we're just calling it directly
+    """
+    This function would ideally start a background job to process the image
+    For simplicity here, we're just calling it directly
+    """
     process_image(image_id)
 
-    
+
 @app.route("/processing/<image_id>")
 def processing(image_id):
-    # Instead of threading, let's call process_image directly.
+    """
+    Instead of threading, let's call process_image directly.
+    """
     try:
         process_image(image_id)
         return redirect(url_for("show_results", image_id=image_id))
     except Exception as e:
-        app.logger.error(f"Error occurred during image processing: {e}")
+        app.logger.error("Error occurred during image processing: %s", e)
         traceback.print_exc()
         flash("An error occurred while processing the image.", "error")
         return redirect(url_for("home"))
 
 
 def process_image(image_id):
-    app.logger.info(f"Starting image processing for image ID: {image_id}")
+    """
+    Function that processes the images for upload
+
+    Returns:
+        Nothing. Prints if the image was processed successfully
+    """
+    app.logger.info("Starting image processing for image ID: %s", image_id)
 
     # Check if the image has already been processed or is being processed
     image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
     if not image_doc:
-        app.logger.error(f"No image found for image ID: {image_id}")
+        app.logger.error("No image found for image ID: %s", image_id)
         return
     if image_doc["status"] != "pending":
-        app.logger.error(f"Image is not pending, current status is: {image_doc["status"]}")
+        app.logger.error("Image is not pending, current status is: %s", image_doc['status'])
         return
     # Proceed with processing
     try:
@@ -135,20 +150,20 @@ def process_image(image_id):
         _, temp_filepath = tempfile.mkstemp()
         with open(temp_filepath, "wb") as f:
             f.write(grid_out.read())
-        app.logger.info(f"Image written to temporary file: {temp_filepath}")
+        app.logger.info("Image written to temporary file: %s", temp_filepath)
         # Call the ML model for processing
         try:
-          with open(temp_filepath, "rb") as file:
-            response = requests.post(
-              "http://machine_learning_client:5001/analyze",
-              files={"file": file},
-              timeout=10,
-            )
-          result = response.json()
-          app.logger.info(f"Received analysis result: {result}")
+            with open(temp_filepath, "rb") as file:
+                response = requests.post(
+                    "http://machine_learning_client:5001/analyze",
+                    files={"file": file},
+                    timeout=10,
+                )
+            result = response.json()
+            app.logger.info("Received analysis result: %s", result)
         finally:
             os.remove(temp_filepath)
-            app.logger.info(f"Temporary file removed: {temp_filepath}")
+            app.logger.info("Temporary file removed: %s", temp_filepath)
 
         # Update the database with the analysis results
         update_result = images_collection.update_one(
@@ -156,8 +171,8 @@ def process_image(image_id):
             {"$set": {"status": "processed"}}
         )
         app.logger.info(
-          f"Image status updated in images_collection."
-          f"Modified count: {update_result.modified_count}"
+          "Image status updated in images_collection. Modified count: %s", 
+          update_result.modified_count
         )
 
         # Insert the result into the results_collection
@@ -170,11 +185,11 @@ def process_image(image_id):
           }
         )
         app.logger.info(
-          f"Result inserted into results_collection with "
-          "ID: {insert_result.inserted_id}"
+            "Result inserted into results_collection with ID: %s",
+            insert_result.inserted_id
        )
     except Exception as e:
-        app.logger.error(f"Error processing image {image_id}: {e}")
+        app.logger.error("Error processing image %s: %s", image_id, e)
         traceback.print_exc()
         # Set status to "failed" to indicate processing did not complete
         images_collection.update_one(
@@ -182,25 +197,24 @@ def process_image(image_id):
             {"$set": {"status": "failed"}}
         )
         app.logger.info(
-          f"Image status updated to 'failed' "
-          "for image ID: {image_id}"
+            "Image status updated to 'failed' for image ID: %s", image_id
         )
-        
-        
+
+
 @app.route("/check_status/<image_id>")
 def check_status(image_id):
-  """
-  Function that checks the status of the images being processed
-
-  Returns:
-    A JSON of the result
-  """
-  image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
-  if image_doc and image_doc["status"] == "processed":
-      return jsonify({"status": "processed", "image_id": str(image_id)})
-  elif image_doc and image_doc["status"] == "failed":
-      return jsonify({"status": "failed"})
-  return jsonify({"status": "pending"})
+    """
+    Function that checks the status of the images being processed
+    
+    Returns:
+        A JSON of the result
+    """
+    image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
+    if image_doc and image_doc["status"] == "processed":
+        return jsonify({"status": "processed", "image_id": str(image_id)})
+    if image_doc and image_doc["status"] == "failed":
+        return jsonify({"status": "failed"})
+    return jsonify({"status": "pending"})
 
 
 @app.route("/results/<image_id>")
@@ -224,7 +238,7 @@ def show_results(image_id):
             # Assuming `result["analysis"]` contains "age" and "gender"
             result.update(result["analysis"])
         except Exception as e:
-            flash("Result not found or error loading image.", "error")
+            flash(f"Result not found or error loading image. {e}", "error")
             return redirect(url_for("home"))
         return render_template("results.html", result=result, filename=result["filename"])
     flash("Result not found.", "error")
