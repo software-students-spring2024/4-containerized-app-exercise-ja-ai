@@ -8,22 +8,6 @@ Our project utilizes ML to estimate the age of a user. Through our web app, the 
 
 Build a containerized app that uses machine learning. See [instructions](./instructions.md) for details.
 
-# How to run
-
-Make sure you have Docker Desktop installed. If you need to install Docker, you can create an account and download it [here](https://www.docker.com/products/docker-desktop/).
-
-You can create a local repository using the following command
-
-    git clone https://github.com/software-students-spring2024/4-containerized-app-exercise-ja-ai.git
-
-The navigate into your local repository. Then run the following command. This will remove any containers whose ports are needed.
-
-    docker-compose down
-
-To install the required dependencies and run the program, run the following command. It may take some time to download all of the necessary dependencies the first time. Once you've installed the required dependencies once, you can run the command without the --build tag.
-
-    docker-compose up --build
-
 # Starter Data
 
 No starter data is required.
