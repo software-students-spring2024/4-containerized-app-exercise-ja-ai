@@ -63,7 +63,7 @@ def process_images(my_app):
                         response = requests.post(
                             "http://machine_learning_client:5001/analyze",
                             files={"file": file},
-                            timeout=10
+                            timeout=10,
                         )
                     result = response.json()
                     os.remove(temp_filepath)
