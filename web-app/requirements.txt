@@ -2,4 +2,4 @@ flask
 werkzeug
 pymongo
 requests
-pyhton-dotenv
+python-dotenv
