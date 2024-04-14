@@ -147,7 +147,7 @@ def upload_image():
                 return redirect(url_for("upload_image"))
         else:
             flash("Invalid file type.", "error")
-    # For GET request or any other case where the POST conditions aren't met,
+    # For GET request or any other case where POST conditions aren't met,
     # render the upload form again.
     return render_template("upload.html")
 
