@@ -15,5 +15,5 @@ def analyze_image(img_path):
     Returns:
     - list: Analysis results including age and gender
     """
-    result = DeepFace.analyze(img_path=img_path, actions=['age', 'gender'])
+    result = DeepFace.analyze(img_path=img_path, actions=["age", "gender"])
     return [result[0]]
