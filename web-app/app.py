@@ -237,8 +237,8 @@ def process_image(image_id):
 
                 # Update the database with the analysis results
                 update_result = images_collection.update_one(
-                    {"_id": image_doc["_id"]}, 
-                    {"$set": {"status": "processed", "analysis": result}}
+                    {"_id": image_doc["_id"]},
+                    {"$set": {"status": "processed", "analysis": result}},
                 )
                 app.logger.info(
                     "Image status updated in images_collection. Modified count: %s",
@@ -278,7 +278,7 @@ def process_image(image_id):
     # got rid of else for pylinting. If necessary, add it back in
     app.logger.error(
         "No image found for image ID: %s after %s attempts.",
-        image_id, 
+        image_id,
         retry_attempts,
     )
 
