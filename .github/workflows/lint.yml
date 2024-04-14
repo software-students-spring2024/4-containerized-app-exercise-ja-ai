@@ -25,7 +25,12 @@ jobs:
         # you may set pylint to ignore any files or dependencies that make no sense to lint
         run: |
           cd ${{ matrix.subdir }}
-          python -m pylint **/*.py
+          pylint_score=$(python -m pylint **/*.py | tee /dev/tty | sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p')
+          echo "Pylint score was $pylint_score"
+          if (( $(echo "$pylint_score < 9.5" | bc -l) )); then
+            echo "Pylint score below 9.5, failing the lint job."
+            exit 1
+          fi
       - name: Format with black
         if: ${{ hashFiles(format('{0}/**/*.py', matrix.subdir)) != '' }}
         # you may set black to ignore any files or dependencies that make no sense to format
