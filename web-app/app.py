@@ -182,7 +182,7 @@ def process_image(image_id):
             {"_id": image_doc["_id"]}, {"$set": {"status": "processed"}}
         )
         app.logger.info(
-            "Image status updated in images_collection. Modified count: %s", 
+            "Image status updated in images_collection. Modified count: %s",
             update_result.modified_count,
         )
 
