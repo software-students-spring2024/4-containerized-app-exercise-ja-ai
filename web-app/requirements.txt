@@ -1,5 +1,4 @@
 flask
 werkzeug
 pymongo
-requests
-cv2
+api
