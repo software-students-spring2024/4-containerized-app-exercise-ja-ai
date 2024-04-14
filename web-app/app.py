@@ -96,11 +96,9 @@ def capture():
             })
 
             # remove the captured file
-
-            os.remove(filepath)
+            # os.remove(filepath)
             # this returns to the index page (where user can upload photo)
-            return redirect(url_for('processing', image_id=str(image_id)))  
-
+            return redirect(url_for('index'))  
     return 'Error: Image capture failed.'
 
 # End Camera Capture
@@ -181,12 +179,6 @@ def upload_image():
         Response: Redirects to processing page or re-renders upload form with error message
     """
     if request.method == 'POST':
-        action = request.form.get('action')
-        actual_age = request.form.get("actual_age")
-
-        if action == 'capture':
-            return capture()
-
         if 'image' not in request.files:
             flash('No file part', 'error')
             return redirect(request.url)
@@ -207,7 +199,7 @@ def upload_image():
             })
             # flash('Image successfully uploaded and awaiting processing.', 'success')
             return redirect(url_for('processing', image_id=str(image_id)))
-    return render_template('index.html')
+    return render_template('upload.html')
 
 @app.route('/processing/<image_id>')
 def processing(image_id):
@@ -228,15 +220,12 @@ def age_comparison_data():
         JSON of the data for the graph
     """
     results = list(results_collection.find({}, {"predicted_age": 1, "actual_age": 1}))
-
-    data = []
-    for result in results:
-        actual_age = result.get("actual_age")
-        if actual_age is not None:
-            data.append({
-                'actual_age': int(actual_age),
-                'predicted_age': result['predicted_age']
-            })
+    data = [
+        {
+            'actual_age': int(result["actual_age"]),
+            'predicted_age': result["predicted_age"]
+        } for result in results
+    ]
     return jsonify(data)
 
 @app.route('/check_status/<image_id>')
@@ -277,18 +266,14 @@ def show_results(image_id):
         try:
             fs_image = fs.get(image_id)
             image_data = base64.b64encode(fs_image.read()).decode('utf-8')
-        except gridfs.errors.NoFile:
-            # flash("No file found in database.", 'error')
-            image_data = None
         except Exception as e:
-            flash('Error retrieving image data: {e}', 'error')
-            # print(f"Error retrieving image data: {e}")
+            # flash('Error retrieving image data', 'error')
+            print(f"Error retrieving image data: {e}")
             image_data = None
 
         predicted_age = result.get('predicted_age')
         actual_age = int(result.get('actual_age', 0))  # Ensure actual_age is an integer
-        is_correct = abs(predicted_age - actual_age) <= 2
-
+        is_correct = abs(predicted_age - actual_age) <= 1
 
         # Include the 'image_data' and 'is_correct' in the result dictionary
         result.update({
