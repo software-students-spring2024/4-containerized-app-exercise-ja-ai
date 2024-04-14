@@ -28,7 +28,6 @@ task_queue = queue.Queue()
 results = {}
 
 
-
 # MongoDB connection
 serverOptions = {
     "socketTimeoutMS": 600000,  # 10 minutes
@@ -63,6 +62,7 @@ def home():
     """
     return render_template("index.html")
 
+
 def process_task():
     """
     Function to process the tasks
@@ -74,19 +74,22 @@ def process_task():
         results[task_id] = "Task Completed"
         task_queue.task_done()
 
+
 # Start a background thread to process tasks
 threading.Thread(target=process_task, daemon=True).start()
 
-@app.route('/start_task', methods=['POST'])
+
+@app.route("/start_task", methods=["POST"])
 def start_task():
     """
     Function to start the tasks
     """
-    task_id = request.json.get('task_id')
+    task_id = request.json.get("task_id")
     task_queue.put(task_id)
     return jsonify({"message": "Task started", "task_id": task_id}), 202
 
-@app.route('/get_result/<task_id>', methods=['GET'])
+
+@app.route("/get_result/<task_id>", methods=["GET"])
 def get_result(task_id):
     """
     Gets the result
@@ -95,7 +98,10 @@ def get_result(task_id):
     if result:
         return jsonify({"task_id": task_id, "status": result})
     return jsonify({"task_id": task_id, "status": "Processing"}), 202
+
+
 app.secret_key = os.getenv("SECRET_KEY")
+
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload_image():
@@ -125,7 +131,9 @@ def upload_image():
                     fs.get(image_id)  # Verify that the image is retrievable
                 except gridfs.errors.NoFile:
                     app.logger.error("Image just saved is not retrievable from GridFS.")
-                    flash("Failed to save image to database, please try again.", "error")
+                    flash(
+                        "Failed to save image to database, please try again.", "error"
+                    )
                     return redirect(url_for("upload_image"))
 
                 images_collection.insert_one(
@@ -194,7 +202,7 @@ def process_image(image_id):
     retry_interval = 5  # seconds
 
     for attempt in range(retry_attempts):
-        app.logger.info("Attempt %d to process image ID: %s", (attempt+1), image_id)
+        app.logger.info("Attempt %d to process image ID: %s", (attempt + 1), image_id)
         try:
             # Attempt to retrieve the image file from GridFS
             grid_out = fs.get(bson.ObjectId(image_id))
@@ -229,7 +237,8 @@ def process_image(image_id):
 
                 # Update the database with the analysis results
                 update_result = images_collection.update_one(
-                    {"_id": image_doc["_id"]}, {"$set": {"status": "processed", "analysis": result}}
+                    {"_id": image_doc["_id"]}, 
+                    {"$set": {"status": "processed", "analysis": result}}
                 )
                 app.logger.info(
                     "Image status updated in images_collection. Modified count: %s",
@@ -261,13 +270,16 @@ def process_image(image_id):
                 images_collection.update_one(
                     {"_id": bson.ObjectId(image_id)}, {"$set": {"status": "failed"}}
                 )
-                app.logger.info("Image status updated to 'failed' for image ID: %s", image_id)
+                app.logger.info(
+                    "Image status updated to 'failed' for image ID: %s", image_id
+                )
         if attempt < retry_attempts - 1:
             time.sleep(retry_interval)
     # got rid of else for pylinting. If necessary, add it back in
     app.logger.error(
         "No image found for image ID: %s after %s attempts.",
-        image_id, retry_attempts,
+        image_id, 
+        retry_attempts,
     )
 
 
