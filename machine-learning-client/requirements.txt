@@ -1,3 +1,5 @@
 tf-keras
 deepface
 pytest
+pylint
+black

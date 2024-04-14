@@ -2,3 +2,6 @@ flask
 werkzeug
 pymongo
 requests
+python-dotenv
+pylint
+black
