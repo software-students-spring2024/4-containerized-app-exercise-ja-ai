@@ -10,7 +10,7 @@ def analyze_image(img_path):
     Analyze an image for age and gender using DeepFace.
 
     Parameters:
-    - img_path (str): Path to the image file
+    - img_path (str): Path to image file
 
     Returns:
     - list: Analysis results including age and gender
