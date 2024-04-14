@@ -4,16 +4,16 @@ Flask App for uploading and processing images.
 
 import base64
 import os
+import queue
 import tempfile
+import threading
+import time
 import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
-import threading
-import queue
-import time
 
 # import werkzeug
 from werkzeug.utils import secure_filename
@@ -26,7 +26,6 @@ load_dotenv()
 app = Flask(__name__)
 task_queue = queue.Queue()
 results = {}
-
 
 
 # MongoDB connection
@@ -63,7 +62,11 @@ def home():
     """
     return render_template("index.html")
 
+
 def process_task():
+    """
+    Function to process the tasks
+    """
     while True:
         task_id = task_queue.get()  # Wait until a task is available
         print(f"Processing task {task_id}")
@@ -71,22 +74,34 @@ def process_task():
         results[task_id] = "Task Completed"
         task_queue.task_done()
 
+
 # Start a background thread to process tasks
 threading.Thread(target=process_task, daemon=True).start()
 
-@app.route('/start_task', methods=['POST'])
+
+@app.route("/start_task", methods=["POST"])
 def start_task():
-    task_id = request.json.get('task_id')
+    """
+    Function to start the tasks
+    """
+    task_id = request.json.get("task_id")
     task_queue.put(task_id)
     return jsonify({"message": "Task started", "task_id": task_id}), 202
 
-@app.route('/get_result/<task_id>', methods=['GET'])
+
+@app.route("/get_result/<task_id>", methods=["GET"])
 def get_result(task_id):
+    """
+    Gets the result
+    """
     result = results.get(task_id)
     if result:
         return jsonify({"task_id": task_id, "status": result})
     return jsonify({"task_id": task_id, "status": "Processing"}), 202
+
+
 app.secret_key = os.getenv("SECRET_KEY")
+
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload_image():
@@ -116,27 +131,31 @@ def upload_image():
                     fs.get(image_id)  # Verify that the image is retrievable
                 except gridfs.errors.NoFile:
                     app.logger.error("Image just saved is not retrievable from GridFS.")
-                    flash("Failed to save image to database, please try again.", "error")
+                    flash(
+                        "Failed to save image to database, please try again.", "error"
+                    )
                     return redirect(url_for("upload_image"))
 
-                images_collection.insert_one({
-                    "image_id": image_id,
-                    "filename": filename,
-                    "status": "pending",
-                    "upload_date": datetime.now(),
-                })
+                images_collection.insert_one(
+                    {
+                        "image_id": image_id,
+                        "filename": filename,
+                        "status": "pending",
+                        "upload_date": datetime.now(),
+                    }
+                )
                 return redirect(url_for("processing", image_id=str(image_id)))
             except errors.PyMongoError as e:
-                app.logger.error(f"Error saving file to database: {e}")
+                app.logger.error("Error saving file to database: %s", e)
                 flash("Error saving file to database.", "error")
                 return redirect(url_for("upload_image"))
             except Exception as e:
-                app.logger.error(f"Unexpected error: {e}")
+                app.logger.error("Unexpected error: %s", e)
                 flash("An unexpected error occurred. Please try again.", "error")
                 return redirect(url_for("upload_image"))
         else:
             flash("Invalid file type.", "error")
-    # For GET request or any other case where the POST conditions aren't met,
+    # For GET request or any other case where POST conditions aren't met,
     # render the upload form again.
     return render_template("upload.html")
 
@@ -183,7 +202,7 @@ def process_image(image_id):
     retry_interval = 5  # seconds
 
     for attempt in range(retry_attempts):
-        app.logger.info(f"Attempt {attempt + 1} to process image ID: {image_id}")
+        app.logger.info("Attempt %d to process image ID: %s", (attempt + 1), image_id)
         try:
             # Attempt to retrieve the image file from GridFS
             grid_out = fs.get(bson.ObjectId(image_id))
@@ -191,7 +210,6 @@ def process_image(image_id):
             app.logger.warning("Image not found in GridFS, retrying...")
             time.sleep(retry_interval)
             continue
-        
         image_doc = images_collection.find_one({"image_id": bson.ObjectId(image_id)})
         if image_doc and image_doc["status"] == "pending":
             # Proceed with processing if image_doc is valid
@@ -219,7 +237,8 @@ def process_image(image_id):
 
                 # Update the database with the analysis results
                 update_result = images_collection.update_one(
-                    {"_id": image_doc["_id"]}, {"$set": {"status": "processed", "analysis": result}}
+                    {"_id": image_doc["_id"]},
+                    {"$set": {"status": "processed", "analysis": result}},
                 )
                 app.logger.info(
                     "Image status updated in images_collection. Modified count: %s",
@@ -240,18 +259,29 @@ def process_image(image_id):
                     insert_result.inserted_id,
                 )
                 return
+            except errors.PyMongoError as e:
+                app.logger.error("MongoDB operation failed: %s", e)
+                # handle MongoDB specific logic here
             except Exception as e:
-                app.logger.error("Error processing image %s: %s", image_id, str(e))
+                app.logger.error("Unexpected error occurred: %s", e)
                 traceback.print_exc()
+            finally:
                 # Set status to "failed" to indicate processing did not complete
                 images_collection.update_one(
                     {"_id": bson.ObjectId(image_id)}, {"$set": {"status": "failed"}}
                 )
-                app.logger.info("Image status updated to 'failed' for image ID: %s", image_id)
+                app.logger.info(
+                    "Image status updated to 'failed' for image ID: %s", image_id
+                )
         if attempt < retry_attempts - 1:
             time.sleep(retry_interval)
-    else:
-        app.logger.error(f"No image found for image ID: {image_id} after {retry_attempts} attempts.")
+    # got rid of else for pylinting. If necessary, add it back in
+    app.logger.error(
+        "No image found for image ID: %s after %s attempts.",
+        image_id,
+        retry_attempts,
+    )
+
 
 @app.route("/check_status/<image_id>")
 def check_status(image_id):
