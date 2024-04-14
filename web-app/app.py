@@ -1,6 +1,7 @@
 """
 Flask App
 """
+
 import base64
 import os
 import tempfile
@@ -61,8 +62,9 @@ def process_images(my_app):
                     with open(temp_filepath, "rb") as file:
                         response = requests.post(
                             "http://machine_learning_client:5001/analyze",
-                            files={"file":file},
-                            timeout=10)
+                            files={"file": file},
+                            timeout=10
+                        )
                     result = response.json()
                     os.remove(temp_filepath)
                     # Update the database with analysis results
@@ -160,7 +162,7 @@ def check_status(image_id):
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
-        return jsonify({"status":"error", "message": "Invalid image ID"}), 400
+        return jsonify({"status": "error", "message": "Invalid image ID"}), 400
     image_doc = images_collection.find_one({"image_id": image_id})
     if image_doc and image_doc["status"] == "processed":
         return jsonify({"status": "processed", "image_id": str(image_id)})
