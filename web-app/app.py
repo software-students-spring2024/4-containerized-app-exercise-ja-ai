@@ -152,7 +152,7 @@ def process_image(image_id):
         return
     if image_doc["status"] != "pending":
         app.logger.error(
-            "Image is not pending, current status is: %s", image_doc['status']
+            "Image is not pending, current status is: %s", image_doc["status"]
         )
         return
     # Proceed with processing
@@ -183,7 +183,7 @@ def process_image(image_id):
         )
         app.logger.info(
             "Image status updated in images_collection. Modified count: %s", 
-            update_result.modified_count
+            update_result.modified_count,
         )
 
         # Insert the result into the results_collection
@@ -192,7 +192,7 @@ def process_image(image_id):
                 "image_id": image_doc["image_id"],
                 "filename": image_doc["filename"],
                 "analysis": result,
-                "upload_date": image_doc["upload_date"]
+                "upload_date": image_doc["upload_date"],
             }
         )
         app.logger.info(
@@ -268,5 +268,6 @@ def show_results(image_id):
     flash("Result not found.", "error")
     return redirect(url_for("home"))
 
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(host="0.0.0.0", port=5002, debug=True)
