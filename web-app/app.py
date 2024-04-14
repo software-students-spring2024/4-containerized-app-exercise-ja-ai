@@ -3,7 +3,6 @@ Flask App
 """
 import base64
 import os
-import sys
 import tempfile
 import threading
 import time
@@ -13,7 +12,6 @@ import bson
 import gridfs
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
-import cv2
 import datetime
 import requests
 
@@ -29,10 +27,22 @@ images_collection = db["images_pending_processing"]
 results_collection = db["image_processing_results"]
 
 def allowed_file(filename):
+    """
+    Function that makes sure the uploaded picture file is in the allowed extensions
+
+    Returns:
+        A boolean
+    """
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def process_images(app):
+    """
+    Function that processes the images for upload
+
+    Returns:
+        Nothing. Prints if the image was processed successfully
+    """
     with app.app_context():
         while True:
             image_doc = images_collection.find_one({"status": "pending"})
@@ -69,10 +79,19 @@ def process_images(app):
 
 @app.route('/', methods=['GET'])
 def home():
+    """
+    Creates the template for the homepage
+    """
     return render_template('index.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
+    """
+    Function to upload the image to be processed
+
+    Returns:
+        The processing.html page
+    """
     if request.method == 'POST':
         try:  # Start of a try block to catch exceptions
             if 'image' not in request.files:
@@ -106,10 +125,22 @@ def upload_image():
 
 @app.route('/processing/<image_id>')
 def processing(image_id):
+    """
+    Function
+    
+    Returns:
+        The processing.html page
+    """
     return render_template('processing.html', image_id=image_id)
 
 @app.route('/check_status/<image_id>')
 def check_status(image_id):
+    """
+    Function that checks the status of the images being processed
+
+    Returns:
+        A JSON of the result
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
@@ -122,6 +153,12 @@ def check_status(image_id):
 
 @app.route('/results/<image_id>')
 def show_results(image_id):
+    """
+    Function that brings you to the results.html after the image is done processing
+
+    Returns:
+        result.html
+    """
     try:
         image_id = bson.ObjectId(image_id)
     except bson.errors.InvalidId:
