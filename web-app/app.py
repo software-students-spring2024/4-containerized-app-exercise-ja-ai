@@ -16,6 +16,8 @@ from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import cv2
 import datetime
+from io import BytesIO
+from PIL import Image
 import requests
 
 app = Flask(__name__)
@@ -42,14 +44,14 @@ def gen_frames():
     while True:
         success, frame = camera.read()
         if not success:
+            print("Failed to grab frame")
             break
-        else:
-            # Convert the frame to JPEG format
-            ret, buffer = cv2.imencode('.jpg', frame)
-            # Store the frame for capturing
-            capture_frame = frame  
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        # Convert the frame to JPEG format
+        ret, buffer = cv2.imencode('.jpg', frame)
+        # Store the frame for capturing
+        capture_frame = frame  
+        yield (b'--frame\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 @app.route('/')
 def index():
@@ -77,6 +79,13 @@ def capture():
             filepath = os.path.join(shots_directory, filename) 
             cv2.imwrite(filepath, capture_frame)  
 
+            # Verify file exists before proceeding
+            if os.path.exists(filepath):
+                print(f"File {filename} saved successfully.")
+            else:
+                print(f"Failed to save file {filename}.")
+                return 'Error: Image capture failed.'
+
             # upload the captured image to MongoDB for use
             with open(filepath, 'rb') as f:
                 image_id = fs.put(f, filename=filename)
@@ -92,7 +101,6 @@ def capture():
             })
 
             # remove the captured file
-
             os.remove(filepath)
             # this returns to the index page (where user can upload photo)
             return redirect(url_for('processing', image_id=str(image_id)))  
@@ -109,11 +117,11 @@ def allowed_file(filename):
 
 def process_images(flask_app):
     """
-    Continously check for and process pending images in the MongoDB
-    Each image is analyzed, and the results are updated in the database
+    Continuously check for and process pending images in MongoDB.
+    Each image is analyzed, and the results are updated in the database.
 
     Args:
-        app (Flask): The Flask application object for context
+        flask_app (Flask): The Flask application object for context.
     """
     with flask_app.app_context():
         while True:
@@ -126,7 +134,9 @@ def process_images(flask_app):
                         f.write(grid_out.read())
 
                     files = {'file': open(temp_filepath, 'rb')}
+                    # Ensure the POST request is sent to the correct service and port
                     response = requests.post('http://machine_learning_client:5001/analyze', files=files)
+                    print("Response from ML client:", response.status_code, response.text) #debugging
                     result = response.json()
                     os.remove(temp_filepath)
 
@@ -156,6 +166,7 @@ def process_images(flask_app):
                 print("No images to process.")
             time.sleep(5)
 
+
 @app.route('/', methods=['GET'])
 def home():
     """
@@ -166,39 +177,63 @@ def home():
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_image():
     """
-    Upload endpoint for submitting images
-    Stores images in MongoDB and marks them as pending for processing
+    Upload endpoint for submitting images.
+    Stores images in MongoDB and marks them as pending for processing.
 
     Returns:
-        Response: Redirects to processing page or re-renders upload form with error message
+        Response: Redirects to processing page or re-renders upload form with error message.
     """
+    print("Upload endpoint hit. Method: ", request.method)
     if request.method == 'POST':
-        action = request.form.get('action')
+        image_data = request.form.get('image_data')
         actual_age = request.form.get("actual_age")
 
-        if action == 'capture':
-            return capture()
+        # Debug: Log the actual content received
+        print("Debug: Received image data (first 100 chars):", image_data[:100] if image_data else "No image data")
+        print("Debug: Received actual age:", actual_age)
 
-        if 'image' not in request.files:
-            flash('No file part', 'error')
-            return redirect(request.url)
-        image = request.files['image']
-        if image.filename == '':
-            flash('No selected file', 'error')
-            return redirect(request.url)
-        if image and allowed_file(image.filename):
-            filename = secure_filename(image.filename)
-            image_id = fs.put(image, filename=filename)
-            actual_age = request.form.get("actual_age")
-            images_collection.insert_one({
-                'image_id': image_id,
-                'filename': filename,
-                'status': 'pending',
-                'upload_date': datetime.now(),
-                "actual_age":actual_age,
-            })
-            # flash('Image successfully uploaded and awaiting processing.', 'success')
-            return redirect(url_for('processing', image_id=str(image_id)))
+        if image_data and actual_age:
+            try:
+                # Remove prefix and decode the image data from base64
+                image_data = image_data.split(';base64,')[1]
+                image_bytes = base64.b64decode(image_data)
+                image = Image.open(BytesIO(image_bytes))
+                print("Debug: Image decoded successfully.")
+
+                # Save the image to a temporary file
+                temp_file_path = 'captured_image.png'
+                image.save(temp_file_path)
+                print("Debug: Image saved temporarily at:", temp_file_path)
+
+                # Store the image in GridFS
+                with open(temp_file_path, 'rb') as file:
+                    image_id = fs.put(file, filename=temp_file_path)
+                    print("Debug: Image stored in GridFS with ID:", image_id)
+
+                # Save image metadata to MongoDB
+                images_collection.insert_one({
+                    'image_id': image_id,
+                    'filename': temp_file_path,
+                    'status': 'pending',
+                    'upload_date': datetime.datetime.now(),
+                    'actual_age': actual_age
+                })
+                print("Debug: Image metadata saved to MongoDB.")
+
+                # Clean up the temporary file
+                os.remove(temp_file_path)
+                print("Debug: Temporary file removed.")
+
+                # Redirect to the processing page
+                return redirect(url_for('processing', image_id=str(image_id)))
+            except Exception as e:
+                print("Error processing image:", str(e))
+                flash('Error processing image', 'error')
+        else:
+            flash('No image provided or actual age missing', 'error')
+            print("Debug: Either image data or actual age was not provided.")
+
+        return redirect(request.url)
     return render_template('index.html')
 
 @app.route('/processing/<image_id>')
@@ -209,6 +244,7 @@ def processing(image_id):
     Returns:
          Response: Redirects to processing page 
     """
+    print(f"Serving the processing page for image_id: {image_id}")
     return render_template('processing.html', image_id=image_id)
 
 @app.route('/age_comparison_data')
@@ -292,6 +328,10 @@ def show_results(image_id):
     flash('Result not found.', 'error')
     return redirect(url_for('home'))
 
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 if __name__ == '__main__':

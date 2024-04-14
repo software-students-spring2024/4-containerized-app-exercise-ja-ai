@@ -16,10 +16,10 @@
                     // Check again after a delay if not processed
                     setTimeout(checkStatus, 2000); // 2 seconds
                 }
-            }).fail(function() {
-                console.log("Error checking status.");
-                //add troubleshooting messages
-            });
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+    console.log("Error checking status:", textStatus, errorThrown);
+});
+
         }
 
         // Call checkStatus() when the page is fully loaded
@@ -30,5 +30,9 @@
 </head>
 <body>
     <h2>Your image is currently being processed. Please wait...</h2>
+    <script>
+        console.log("Redirected to the processing page with image_id:", "{{ image_id }}");
+    </script>
+      
 </body>
 </html>

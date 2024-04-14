@@ -4,6 +4,7 @@ This module provides functionalities to analyze images for age.
 """
 
 from deepface import DeepFace
+import logging
 
 def analyze_image(img_path):
     """
@@ -13,7 +14,11 @@ def analyze_image(img_path):
     - img_path (str): Path to the image file
 
     Returns:
-    - list: Analysis results including age and gender
+    - dict: Analysis results including age and gender
     """
-    result = DeepFace.analyze(img_path=img_path, actions=['age', 'gender'])
-    return [result[0]]
+    try:
+        result = DeepFace.analyze(img_path=img_path, actions=['age', 'gender'])
+        return result  # This returns the entire result dictionary
+    except Exception as e:
+        logging.error("Failed to analyze image: " + str(e))
+        return None

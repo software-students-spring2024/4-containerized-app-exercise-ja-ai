@@ -17,12 +17,14 @@
 
     <!-- Form to submit captured image -->
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <!-- Hidden field to store the image data -->
+        <!-- Hidden field for base64 image data -->
         <input type="hidden" name="image_data" id="image_data">
+        <!-- Actual age input field -->
         <label for="actual_age">Your Actual Age:</label>
         <input type="number" id="actual_age" name="actual_age" required>
         <button type="submit">Submit</button>
     </form>
+    
 
     <script>
         // Get access to the camera!
@@ -43,8 +45,11 @@
         snapButton.addEventListener("click", function() {
             context.drawImage(video, 0, 0, 640, 480);
             var imageData = canvas.toDataURL('image/png');
+            console.log("Captured Image Data:", imageData); //debugging
             document.getElementById('image_data').value = imageData;
-        });
+});
+
+
     </script>
 
     {% with messages = get_flashed_messages(with_categories=true) %}

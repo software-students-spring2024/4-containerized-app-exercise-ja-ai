@@ -16,7 +16,7 @@ services:
     depends_on:
       - mongodb
     ports:
-      - "8000:8000"
+      - "5001:5001"
     networks:
       - app-network
 
@@ -28,7 +28,7 @@ services:
       - machine-learning-client
       - mongodb
     ports:
-      - "5001:5000"
+      - "5002:5000"
     networks:
       - app-network
     
