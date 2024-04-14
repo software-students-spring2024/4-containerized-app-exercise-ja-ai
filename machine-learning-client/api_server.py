@@ -8,6 +8,7 @@ from deepface import DeepFace
 
 logging.basicConfig(level=logging.INFO)
 
+
 def analyze_image(img_path):
     """
     Analyze an image for age and gender using DeepFace.
@@ -20,9 +21,9 @@ def analyze_image(img_path):
     """
     try:
         logging.info("Analyzing the image at path: %s", img_path)
-        result = DeepFace.analyze(img_path=img_path, actions=['age', 'gender'])
+        result = DeepFace.analyze(img_path=img_path, actions=["age", "gender"])
         logging.info("Analysis result: %s", result)
-        return [result[0]['age'], result[0]['gender']]
+        return [result[0]["age"], result[0]["gender"]]
     except Exception as e:
         logging.error("An error occurred during image analysis: %s", e)
         raise
