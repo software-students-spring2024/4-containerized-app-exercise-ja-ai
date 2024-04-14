@@ -1,11 +1,21 @@
+"""
+API Server
+"""
+import os
 from flask import Flask, request, jsonify
 from api import analyze_image
-import os
+
 
 app = Flask(__name__)
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    """
+    Method to communicate between the web-app and the machine learning client
+
+    Returns:
+        A JSON of the result
+    """
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     file = request.files['file']
