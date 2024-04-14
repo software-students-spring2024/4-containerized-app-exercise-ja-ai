@@ -10,16 +10,6 @@
     <!-- Instructions for users -->
     <p>Please upload your image to estimate your age</p>
 
-    <!-- Camera Feed -->
-    <h1>Camera Feed</h1>
-
-    <!-- Display the live camera feed -->
-    <img src="{{ url_for('video_feed') }}" width="640" height="480">
-
-    <!-- Capture an image -->
-    <form action="/capture" method="post">
-        <button type="submit">Capture Image</button>
-    </form>
     <!-- Link to the upload page -->
     <a href="{{ url_for('upload_image') }}">Upload Image</a>
 
