@@ -40,13 +40,13 @@ def create_app():
     )
 
     # MongoDB connection
-    serverOptions = {
+    server_options = {
         "socketTimeoutMS": 600000,  # 10 minutes
         "connectTimeoutMS": 30000,  # 30 seconds
         "serverSelectionTimeoutMS": 30000,  # 30 seconds
     }
 
-    client = MongoClient("mongodb://mongodb:27017/", **serverOptions)
+    client = MongoClient("mongodb://mongodb:27017/", **server_options)
     db = client["faces"]
     fs = gridfs.GridFS(db)
 
@@ -267,7 +267,7 @@ def create_app():
                 "results.html", result=result, filename=result["filename"]
             )
         flash("Result not found.", "error")
-        return redirect(url_for("home"))
+        return redirect(url_for("home")
     
     return app
 
