@@ -268,7 +268,6 @@ def create_app():
             )
         flash("Result not found.", "error")
         return redirect(url_for("home")
-    
     return app
 
 
