@@ -46,6 +46,40 @@ results_collection = db["image_processing_results"]
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 
+@app.route("/processing/<image_id>")
+def processing(image_id):
+    """
+    Instead of threading, let's call process_image directly.
+    """
+
+    grid_out = fs.get(bson.ObjectId(image_id))
+    _, temp_filepath = tempfile.mkstemp()
+    with open(temp_filepath, "wb") as f:
+        f.write(grid_out.read())
+    with open(temp_filepath, "rb") as file:
+        response = requests.post(
+            "http://machine-learning-client:5001/analyze",
+            files={"file": file},
+            data={"image_id":str(image_id)},
+            timeout=1000,
+        )
+
+    max_retries = 50
+    wait_interval = 5
+
+    for i in range(max_retries):
+        current_image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
+        if current_image_doc and current_image_doc.get("status") == "success":
+            return redirect(url_for("show_results", image_id=image_id))
+        elif current_image_doc and current_image_doc.get("status") == "failed":
+            # call a method that prints an error message to the screen
+            print("no")
+
+        time.sleep(wait_interval)
+
+    # call a method that prints an error message to the screen
+
+
 def allowed_file(filename):
     """
     Function that makes sure the uploaded picture file is in the allowed extensions
@@ -141,146 +175,6 @@ def upload_image():
             return jsonify({"error": "Invalid file type"}), 400
     return render_template("upload.html")
 
-def start_processing(image_id):
-    """
-    This function would ideally start a background job to process the image
-    For simplicity here, we're just calling it directly
-    """
-    process_image(image_id)
-
-@app.route("/processing/<image_id>")
-def processing(image_id):
-    """
-    Instead of threading, let's call process_image directly.
-    """
-    try:
-        process_image(image_id)
-        return redirect(url_for("show_results", image_id=image_id))
-    except ValueError as ve:
-        app.logger.error("Processing error: %s", str(ve))
-        flash("Error processing image. " + str(ve), "error")
-        return redirect(url_for("home")), 500
-    except Exception as e:
-        app.logger.error("Unexpected error: %s", str(e))
-        flash("An unexpected error occurred. Please try again.", "error")
-        return redirect(url_for("home")), 500
-
-
-def process_image(image_id):
-    """
-    Function that processes the images for upload.
-
-    Args:
-        image_id (str): The MongoDB document ID of the image to be processed.
-    """
-    grid_out = fs.get(bson.ObjectId(image_id))
-    _, temp_filepath = tempfile.mkstemp()
-    with open(temp_filepath, "wb") as f:
-        f.write(grid_out.read())
-    with open(temp_filepath, "rb") as file:
-        response = requests.post(
-            "http://machine-learning-client:5001/analyze",
-            files={"file": file},
-            timeout=600,
-        )
-    result = response.json()
-    app.logger.info(f"Data received from ML model: {result}")
-    validated_result = validate_and_transform_ml_data(result)
-    if validated_result is None:
-        raise ValueError("Invalid data received from ML model")
-    update_analysis_result(image_id, validated_result)
-    return "Success"
-
-def validate_and_transform_ml_data(data):
-    """
-    Ensures the ML model's output matches the expected format.
-    Args:
-        data (list): The raw data list from the ML model.
-    Returns:
-        list: Transformed data if valid, None if invalid.
-    """
-    if not isinstance(data, list):
-        app.logger.error("Invalid ML data format: Not a list")
-        return None
-    for entry in data:
-        if not isinstance(entry, dict) or 'age' not in entry:
-            app.logger.error(f"Invalid ML data format: Entry issue {entry}")
-            return None
-    transformed_data = [{'age': entry['age']} for entry in data]
-    return transformed_data
-
-
-
-def update_analysis_result(image_doc, ages):
-    # Update the database with the age results
-    update_result = images_collection.update_one(
-        {"_id": image_doc["_id"]},
-        {"$set": {"status": "processed", "analysis": {"ages": ages}}}
-    )
-    app.logger.info(f"Image status updated in images_collection. Modified count: {update_result.modified_count}")
-
-    # Insert the result into the results_collection if needed
-    results_collection.insert_one({
-        "image_id": image_doc["image_id"],
-        "filename": image_doc["filename"],
-        "analysis": {"ages": ages},
-        "upload_date": image_doc["upload_date"],
-    })
-    app.logger.info("Result inserted into results_collection.")
-
-
-def process_result(image_doc, result):
-    """
-    Update database and handle the correct result format.
-
-    Args:
-        image_doc (dict): The document of the image being processed.
-        result (list): The result of the image processing to be stored.
-    """
-    update_result = images_collection.update_one(
-        {"_id": image_doc["_id"]},
-        {"$set": {"status": "processed", "analysis": result}}
-    )
-    app.logger.info("DB update success, modified count: %s", update_result.modified_count)
-    results_collection.insert_one({
-        "image_id": image_doc["image_id"],
-        "filename": image_doc["filename"],
-        "analysis": result,
-        "upload_date": image_doc["upload_date"],
-    })
-
-
-def task_cleanup(image_id, status="failed"):
-    """
-    Cleanup or update task status in the database.
-
-    Args:
-        image_id (str): The MongoDB document ID of the image.
-        status (str): The status to be set for the task.
-    """
-    images_collection.update_one(
-        {"_id": bson.ObjectId(image_id)},
-        {"$set": {"status": status}}
-    )
-    app.logger.info(f"Image status updated to '{status}' for image ID: {image_id}")
-
-
-
-@app.route("/check_status/<image_id>")
-def check_status(image_id):
-    """
-    Function that checks the status of the images being processed
-
-    Returns:
-        A JSON of the result
-    """
-    image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
-    if image_doc and image_doc["status"] == "processed":
-        return jsonify({"status": "processed", "image_id": str(image_id)})
-    if image_doc and image_doc["status"] == "failed":
-        return jsonify({"status": "failed"})
-    return jsonify({"status": "pending"})
-
 
 @app.route("/results/<image_id>")
 def show_results(image_id):
@@ -290,52 +184,20 @@ def show_results(image_id):
     Returns:
         result.html
     """
-    try:
-        # Convert the image_id to a BSON ObjectId
-        obj_id = bson.ObjectId(image_id)
-        result = results_collection.find_one({"image_id": obj_id}, {"_id": 0})
-        if not result:
-            flash("Result not found.", "error")
-            return redirect(url_for("home"))
-
-        # Retrieve and encode the image data
-        try:
-            fs_image = fs.get(obj_id)
-            result["image_data"] = base64.b64encode(fs_image.read()).decode("utf-8")
-        except Exception as e:
-            app.logger.error("Failed to retrieve or encode image data: %s", e)
-            flash("Failed to retrieve image data.", "error")
-            return redirect(url_for("home"))
-
-        # Ensure the analysis results are in the expected format (list of dictionaries)
-        if "analysis" in result:
-            if isinstance(result["analysis"], list) and all(isinstance(face, dict) for face in result["analysis"]):
-                faces_data = [{
-                    "age": face.get("age"),
-                    "gender": face.get("dominant_gender"),
-                    "confidence": face.get("face_confidence")
-                } for face in result["analysis"]]
-                result["faces_data"] = faces_data
-            else:
-                app.logger.error("Analysis results are not in the expected format: %s", result["analysis"])
-                flash("Analysis results are incomplete or in an unexpected format.", "error")
-                return redirect(url_for("home"))
-        else:
-            app.logger.error("No analysis results found in the document.")
-            flash("No analysis results found.", "error")
-            return redirect(url_for("home"))
-
-        # Render the results page with the processed data
-        return render_template("results.html", result=result)
-    except bson.errors.InvalidId:
-        app.logger.error("Invalid ObjectId: %s", image_id)
-        flash("Invalid image ID.", "error")
-        return redirect(url_for("home"))
-    except Exception as e:
-        app.logger.error(f"Error processing results: {e}")
-        flash(f"An error occurred: {str(e)}", "error")
+    # Convert the image_id to a BSON ObjectId
+    obj_id = bson.ObjectId(image_id)
+    result = results_collection.find_one({"image_id": obj_id}, {"_id": 0})
+    if not result:
+        flash("Result not found.", "error")
         return redirect(url_for("home"))
 
+    # Retrieve and encode the image data
+    fs_image = fs.get(obj_id)
+    result["predicted_age"] = base64.b64encode(fs_image.read()).decode("utf-8")
+
+    # Render the results page with the processed data
+    return render_template("results.html", result=result)
+  
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=True)
