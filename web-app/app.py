@@ -20,9 +20,6 @@ from werkzeug.utils import secure_filename
 from pymongo import MongoClient, errors
 import requests
 
-
-
-
 def create_app():
 
     load_dotenv()
@@ -55,6 +52,7 @@ def create_app():
             A boolean
         """
         return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 
     @app.route("/", methods=["GET"])
