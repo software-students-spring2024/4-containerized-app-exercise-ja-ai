@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
+from requests.exceptions import RequestException
 
 # import werkzeug
 from werkzeug.utils import secure_filename
@@ -117,48 +118,28 @@ def upload_image():
     if request.method == "POST":
         if "image" not in request.files:
             flash("No file part", "error")
-            return redirect(url_for("upload_image"))
+            return jsonify({"error": "No file part"}), 400
         image = request.files["image"]
         if image.filename == "":
             flash("No selected file", "error")
-            return redirect(url_for("upload_image"))
+            return jsonify({"error": "No selected file"}), 400
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             try:
                 image_id = fs.put(image, filename=filename)
-                # Immediate check to ensure the image is available in GridFS
-                try:
-                    fs.get(image_id)  # Verify that the image is retrievable
-                except gridfs.errors.NoFile:
-                    app.logger.error("Image just saved is not retrievable from GridFS.")
-                    flash(
-                        "Failed to save image to database, please try again.", "error"
-                    )
-                    return redirect(url_for("upload_image"))
-
-                images_collection.insert_one(
-                    {
-                        "image_id": image_id,
-                        "filename": filename,
-                        "status": "pending",
-                        "upload_date": datetime.now(),
-                    }
-                )
-                return redirect(url_for("processing", image_id=str(image_id)))
-            except errors.PyMongoError as e:
-                app.logger.error("Error saving file to database: %s", e)
-                flash("Error saving file to database.", "error")
-                return redirect(url_for("upload_image"))
+                images_collection.insert_one({
+                    "image_id": image_id,
+                    "filename": filename,
+                    "status": "pending",
+                    "upload_date": datetime.now(),
+                })
+                return jsonify({"message": "File uploaded successfully", "task_id": str(image_id)}), 200
             except Exception as e:
-                app.logger.error("Unexpected error: %s", e)
-                flash("An unexpected error occurred. Please try again.", "error")
-                return redirect(url_for("upload_image"))
+                app.logger.error("Upload failed: %s", str(e))
+                return jsonify({"error": "Failed to upload image"}), 500
         else:
-            flash("Invalid file type.", "error")
-    # For GET request or any other case where POST conditions aren't met,
-    # render the upload form again.
+            return jsonify({"error": "Invalid file type"}), 400
     return render_template("upload.html")
-
 
 def start_processing(image_id):
     """
@@ -166,7 +147,6 @@ def start_processing(image_id):
     For simplicity here, we're just calling it directly
     """
     process_image(image_id)
-
 
 @app.route("/processing/<image_id>")
 def processing(image_id):
@@ -176,111 +156,114 @@ def processing(image_id):
     try:
         process_image(image_id)
         return redirect(url_for("show_results", image_id=image_id))
-    except errors.PyMongoError as e:
-        app.logger.error("Database error during image processing: %s", e)
-        flash("A database error occurred while processing the image.", "error")
-    except requests.exceptions.RequestException as e:
-        app.logger.error("HTTP request error during image processing: %s", e)
-        flash("A network error occurred while processing the image.", "error")
-    except OSError as e:
-        app.logger.error("File handling error during image processing: %s", e)
-        flash("A file handling error occurred while processing the image.", "error")
-    # except Exception as e:
-    #     app.logger.error("An unexpected error occurred during image processing: %s", e)
-    #     flash("An unexpected error occurred while processing the image.", "error")
-    return redirect(url_for("home"))
+    except ValueError as ve:
+        app.logger.error("Processing error: %s", str(ve))
+        flash("Error processing image. " + str(ve), "error")
+        return redirect(url_for("home")), 500
+    except Exception as e:
+        app.logger.error("Unexpected error: %s", str(e))
+        flash("An unexpected error occurred. Please try again.", "error")
+        return redirect(url_for("home")), 500
 
 
 def process_image(image_id):
     """
-    Function that processes the images for upload
+    Function that processes the images for upload.
 
-    Returns:
-        Nothing. Prints if the image was processed successfully
+    Args:
+        image_id (str): The MongoDB document ID of the image to be processed.
     """
-    retry_attempts = 5
-    retry_interval = 5  # seconds
+    grid_out = fs.get(bson.ObjectId(image_id))
+    _, temp_filepath = tempfile.mkstemp()
+    with open(temp_filepath, "wb") as f:
+        f.write(grid_out.read())
+    with open(temp_filepath, "rb") as file:
+        response = requests.post(
+            "http://machine-learning-client:5001/analyze",
+            files={"file": file},
+            timeout=600,
+        )
+    result = response.json()
+    app.logger.info(f"Data received from ML model: {result}")
+    validated_result = validate_and_transform_ml_data(result)
+    if validated_result is None:
+        raise ValueError("Invalid data received from ML model")
+    update_analysis_result(image_id, validated_result)
+    return "Success"
 
-    for attempt in range(retry_attempts):
-        app.logger.info("Attempt %d to process image ID: %s", (attempt + 1), image_id)
-        try:
-            # Attempt to retrieve the image file from GridFS
-            grid_out = fs.get(bson.ObjectId(image_id))
-        except gridfs.errors.NoFile:
-            app.logger.warning("Image not found in GridFS, retrying...")
-            time.sleep(retry_interval)
-            continue
-        image_doc = images_collection.find_one({"image_id": bson.ObjectId(image_id)})
-        if image_doc and image_doc["status"] == "pending":
-            # Proceed with processing if image_doc is valid
-            try:
-                # Retrieve the image file from GridFS
-                grid_out = fs.get(image_doc["image_id"])
-                _, temp_filepath = tempfile.mkstemp()
-                with open(temp_filepath, "wb") as f:
-                    f.write(grid_out.read())
-                app.logger.info("Image written to temporary file: %s", temp_filepath)
+def validate_and_transform_ml_data(data):
+    """
+    Ensures the ML model's output matches the expected format.
+    Args:
+        data (list): The raw data list from the ML model.
+    Returns:
+        list: Transformed data if valid, None if invalid.
+    """
+    if not isinstance(data, list):
+        app.logger.error("Invalid ML data format: Not a list")
+        return None
+    for entry in data:
+        if not isinstance(entry, dict) or 'age' not in entry:
+            app.logger.error(f"Invalid ML data format: Entry issue {entry}")
+            return None
+    transformed_data = [{'age': entry['age']} for entry in data]
+    return transformed_data
 
-                # Call the ML model for processing
-                try:
-                    with open(temp_filepath, "rb") as file:
-                        response = requests.post(
-                            "http://machine-learning-client:5001/analyze",
-                            files={"file": file},
-                            timeout=10,
-                        )
-                    result = response.json()
-                    app.logger.info("Received analysis result: %s", result)
-                finally:
-                    os.remove(temp_filepath)
-                    app.logger.info("Temporary file removed: %s", temp_filepath)
 
-                # Update the database with the analysis results
-                update_result = images_collection.update_one(
-                    {"_id": image_doc["_id"]},
-                    {"$set": {"status": "processed", "analysis": result}},
-                )
-                app.logger.info(
-                    "Image status updated in images_collection. Modified count: %s",
-                    update_result.modified_count,
-                )
 
-                # Insert the result into the results_collection
-                insert_result = results_collection.insert_one(
-                    {
-                        "image_id": image_doc["image_id"],
-                        "filename": image_doc["filename"],
-                        "analysis": result,
-                        "upload_date": image_doc["upload_date"],
-                    }
-                )
-                app.logger.info(
-                    "Result inserted into results_collection with ID: %s",
-                    insert_result.inserted_id,
-                )
-                return
-            except errors.PyMongoError as e:
-                app.logger.error("MongoDB operation failed: %s", e)
-                # handle MongoDB specific logic here
-            except Exception as e:
-                app.logger.error("Unexpected error occurred: %s", e)
-                traceback.print_exc()
-            finally:
-                # Set status to "failed" to indicate processing did not complete
-                images_collection.update_one(
-                    {"_id": bson.ObjectId(image_id)}, {"$set": {"status": "failed"}}
-                )
-                app.logger.info(
-                    "Image status updated to 'failed' for image ID: %s", image_id
-                )
-        if attempt < retry_attempts - 1:
-            time.sleep(retry_interval)
-    # got rid of else for pylinting. If necessary, add it back in
-    app.logger.error(
-        "No image found for image ID: %s after %s attempts.",
-        image_id,
-        retry_attempts,
+def update_analysis_result(image_doc, ages):
+    # Update the database with the age results
+    update_result = images_collection.update_one(
+        {"_id": image_doc["_id"]},
+        {"$set": {"status": "processed", "analysis": {"ages": ages}}}
     )
+    app.logger.info(f"Image status updated in images_collection. Modified count: {update_result.modified_count}")
+
+    # Insert the result into the results_collection if needed
+    results_collection.insert_one({
+        "image_id": image_doc["image_id"],
+        "filename": image_doc["filename"],
+        "analysis": {"ages": ages},
+        "upload_date": image_doc["upload_date"],
+    })
+    app.logger.info("Result inserted into results_collection.")
+
+
+def process_result(image_doc, result):
+    """
+    Update database and handle the correct result format.
+
+    Args:
+        image_doc (dict): The document of the image being processed.
+        result (list): The result of the image processing to be stored.
+    """
+    update_result = images_collection.update_one(
+        {"_id": image_doc["_id"]},
+        {"$set": {"status": "processed", "analysis": result}}
+    )
+    app.logger.info("DB update success, modified count: %s", update_result.modified_count)
+    results_collection.insert_one({
+        "image_id": image_doc["image_id"],
+        "filename": image_doc["filename"],
+        "analysis": result,
+        "upload_date": image_doc["upload_date"],
+    })
+
+
+def task_cleanup(image_id, status="failed"):
+    """
+    Cleanup or update task status in the database.
+
+    Args:
+        image_id (str): The MongoDB document ID of the image.
+        status (str): The status to be set for the task.
+    """
+    images_collection.update_one(
+        {"_id": bson.ObjectId(image_id)},
+        {"$set": {"status": status}}
+    )
+    app.logger.info(f"Image status updated to '{status}' for image ID: {image_id}")
+
 
 
 @app.route("/check_status/<image_id>")
@@ -308,31 +291,50 @@ def show_results(image_id):
         result.html
     """
     try:
-        image_id = bson.ObjectId(image_id)
+        # Convert the image_id to a BSON ObjectId
+        obj_id = bson.ObjectId(image_id)
+        result = results_collection.find_one({"image_id": obj_id}, {"_id": 0})
+        if not result:
+            flash("Result not found.", "error")
+            return redirect(url_for("home"))
+
+        # Retrieve and encode the image data
+        try:
+            fs_image = fs.get(obj_id)
+            result["image_data"] = base64.b64encode(fs_image.read()).decode("utf-8")
+        except Exception as e:
+            app.logger.error("Failed to retrieve or encode image data: %s", e)
+            flash("Failed to retrieve image data.", "error")
+            return redirect(url_for("home"))
+
+        # Ensure the analysis results are in the expected format (list of dictionaries)
+        if "analysis" in result:
+            if isinstance(result["analysis"], list) and all(isinstance(face, dict) for face in result["analysis"]):
+                faces_data = [{
+                    "age": face.get("age"),
+                    "gender": face.get("dominant_gender"),
+                    "confidence": face.get("face_confidence")
+                } for face in result["analysis"]]
+                result["faces_data"] = faces_data
+            else:
+                app.logger.error("Analysis results are not in the expected format: %s", result["analysis"])
+                flash("Analysis results are incomplete or in an unexpected format.", "error")
+                return redirect(url_for("home"))
+        else:
+            app.logger.error("No analysis results found in the document.")
+            flash("No analysis results found.", "error")
+            return redirect(url_for("home"))
+
+        # Render the results page with the processed data
+        return render_template("results.html", result=result)
     except bson.errors.InvalidId:
+        app.logger.error("Invalid ObjectId: %s", image_id)
         flash("Invalid image ID.", "error")
         return redirect(url_for("home"))
-    result = results_collection.find_one({"image_id": image_id}, {"_id": 0})
-    if result:
-        try:
-            fs_image = fs.get(image_id)
-            result["image_data"] = base64.b64encode(fs_image.read()).decode("utf-8")
-            # Assuming `result["analysis"]` contains "age" and "gender"
-            result.update(result["analysis"])
-        except gridfs.errors.NoFile:
-            flash("File not found in database.", "error")
-            return redirect(url_for("home"))
-        except KeyError as e:
-            flash(f"Key error in result analysis: {str(e)}", "error")
-            return redirect(url_for("home"))
-        except gridfs.errors.GridFSError as e:
-            flash(f"Error accessing file in GridFS: {str(e)}", "error")
-            return redirect(url_for("home"))
-        return render_template(
-            "results.html", result=result, filename=result["filename"]
-        )
-    flash("Result not found.", "error")
-    return redirect(url_for("home"))
+    except Exception as e:
+        app.logger.error(f"Error processing results: {e}")
+        flash(f"An error occurred: {str(e)}", "error")
+        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
