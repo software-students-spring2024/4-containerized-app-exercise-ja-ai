@@ -27,7 +27,7 @@ def create_app():
 
     load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
-    app.config.from_mappping(
+    app.config.from_mapping(
         SECRET_KEY =  os.getenv("SECRET_KEY"),
     )
 
@@ -47,8 +47,6 @@ def create_app():
 
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
-    if test_config is None:
-        app.config.
     def allowed_file(filename):
         """
         Function that makes sure the uploaded picture file is in the allowed extensions
