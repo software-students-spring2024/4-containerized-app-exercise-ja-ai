@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Upload Image</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
     <script>
         function startTask() {
             var formData = new FormData(document.getElementById('uploadForm'));
@@ -17,17 +18,31 @@
             })
             .catch(error => alert('Error starting task: ' + error));
         }
+
+        // hide flash messages if they don't exist
+        function hideFlashMessages() {
+            var flashMessages = document.getElementById('flashMessages');
+            if (flashMessages.innerHTML.trim() === '') {
+                flashMessages.style.display = 'none';
+            }
+        }
+
+        // hide flash messages on page load
+        window.onload = hideFlashMessages;
     </script>
 </head>
 <body>
-    <h1>Upload Image for Age Estimation</h1>
-    <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
-        <label for="image">Select image:</label>
-        <input type="file" id="image" name="image" required>
-        <label for="actual_age">Your Actual Age:</label>
-        <input type="number" id="actual_age" name="actual_age">
-        <input type="submit" value="Upload">
-    </form>
-    <p>{{ get_flashed_messages() }}</p>
+    <h1>Age Estimation</h1>
+    <div class="container">
+        <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
+            <h2>Upload Image for Age Estimation</h2>
+            <label for="image">Select image:</label>
+            <input type="file" id="image" name="image" required>
+            <label for="actual_age">Your actual age:</label>
+            <input type="number" id="actual_age" name="actual_age">
+            <input type="submit" value="Upload">
+        </form>
+        <p id="flashMessages">{{ get_flashed_messages() }}</p>
+    </div>
 </body>
 </html>
