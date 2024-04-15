@@ -1,4 +1,18 @@
 import pytest
+import bson
+import gridfs
+import sys
+import os
+from flask import Flask
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web_app")))
+
+IMAGE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tester_photo.png"))
+
+from app import allowed_file
+
+print(allowed_file)
+print(type(allowed_file))
 
 def test_allowed_file():
     # Tests cases: allowed file types
@@ -19,7 +33,7 @@ def test_home(client):
     assert response.status_code == 200
     assert b'Welcome' in response.data
 
-def tests_upload_image(client):
+def test_upload_image(client):
     """
     Test upload_image route
     """
@@ -30,14 +44,18 @@ def test_processing(client):
     """
     Test processing route
     """
-    response = client.get('/processing/123')
-    assert response.status_code == 302
+    with open(IMAGE_PATH, "rb") as image_file:
+        response = client.get('/processing/tester_photo.png', data={'image': image_file})
 
-def tests_check_status(client):
+    assert response.status_code == 200
+    assert b'Success' in resonse.data
+
+def test_check_status(client):
     """
     Test check_status route
     """
-    resopnse = client.get('/processing/123')
+    with open(IMAGE_PATH, "rb") as image_file:
+        response = client.get("/processing/tester_photo.png")
     assert response.status_code == 200
     assert b'pending' in response.data
 
@@ -45,5 +63,5 @@ def test_show_results(client):
     """
     Test show_results route
     """
-    response = client.get('/results/123')
+    response = client.get('/results/123.jpg')
     assert response.status_code == 302
