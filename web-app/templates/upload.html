@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
     <title>Upload Image</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
@@ -32,11 +33,13 @@
     </script>
 </head>
 <body>
+    <div class="container">
     <h1>Upload Image for Age Estimation</h1>
     <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
-        <label for="image">Select image:</label>
+        <h2><label for="image">Select image:</label></h2>
         <input type="file" id="image" name="image" required>
         <input type="submit" value="Upload">
     </form>
+</div>
 </body>
 </html>
