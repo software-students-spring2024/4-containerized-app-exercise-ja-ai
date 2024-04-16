@@ -12,14 +12,14 @@
             })
             .then(response => {
                 if (response.ok) {
-                    return response.json();  // Proceed only if the response is OK
+                    return response.json();
                 } else {
                     throw new Error('Failed to start task: Server responded with status ' + response.status);
                 }
             })
             .then(data => {
                 if (data.task_id) {
-                    window.location.href = "/processing/" + data.task_id;  // Redirect to processing page
+                    window.location.href = "/processing/" + data.task_id;
                 } else {
                     throw new Error('Response JSON from server does not contain task_id');
                 }
@@ -36,6 +36,8 @@
     <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
         <label for="image">Select image:</label>
         <input type="file" id="image" name="image" required>
+        <label for="age">Enter your actual age:</label>
+        <input type="number" id="age" name="age" required min="0" placeholder="Your age">
         <input type="submit" value="Upload">
     </form>
 </body>

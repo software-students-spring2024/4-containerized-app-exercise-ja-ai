@@ -151,10 +151,11 @@ def upload_image():
         or re-render the upload page with appropriate error messages if not.
     """
     if request.method == "POST":
-        if "image" not in request.files:
-            flash("No file part", "error")
-            return jsonify({"error": "No file part"}), 400
+        if "image" not in request.files or "age" not in request.form:
+            flash("Missing data", "error")
+            return jsonify({"error": "Missing data"}), 400
         image = request.files["image"]
+        actual_age = request.form["age"]
         if image.filename == "":
             flash("No selected file", "error")
             return jsonify({"error": "No selected file"}), 400
@@ -168,6 +169,7 @@ def upload_image():
                         "filename": filename,
                         "status": "pending",
                         "upload_date": datetime.now(),
+                        "actual_age": str(actual_age),
                     }
                 )
                 return (

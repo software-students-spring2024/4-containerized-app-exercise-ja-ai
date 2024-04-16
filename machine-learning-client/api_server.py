@@ -55,10 +55,12 @@ def analyze():
             {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "success"}},
         )
+        print(images_collection.find_one({"image_id": image_id}).get("actual_age"))
         results_collection.insert_one(
             {
                 "image_id": bson.ObjectId(image_id),
                 "predicted_age": result,
+                "actual_age": images_collection.find_one({"image_id": image_id}).get("actual_age"),
             }
         )
         return jsonify(result)
