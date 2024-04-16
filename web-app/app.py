@@ -8,12 +8,14 @@ import queue
 import tempfile
 import threading
 import time
+
 # import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
+
 # from requests.exceptions import RequestException
 
 # import werkzeug
@@ -212,13 +214,19 @@ def show_results(image_id):
     labels = []
     index = 0
     for result in all_results:
-        if 'actual_age' in result and 'predicted_age' in result:
-            actual_ages.append(result['actual_age'])
-            predicted_ages.append(result['predicted_age'])
+        if "actual_age" in result and "predicted_age" in result:
+            actual_ages.append(result["actual_age"])
+            predicted_ages.append(result["predicted_age"])
             labels.append(str(index))  # Use the index or any specific identifier
             index += 1
 
-    return render_template("results.html", specific_result=specific_result, predicted_ages=predicted_ages, actual_ages=actual_ages, labels=labels)
+    return render_template(
+        "results.html",
+        specific_result=specific_result,
+        predicted_ages=predicted_ages,
+        actual_ages=actual_ages,
+        labels=labels,
+    )
 
 
 if __name__ == "__main__":
