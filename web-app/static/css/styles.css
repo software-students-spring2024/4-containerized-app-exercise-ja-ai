@@ -1,4 +1,16 @@
 /* General Body Styles */
+@font-face {
+    font-family: bion;
+    src: url("../fonts/bion.ttf");
+}
+
+.container{
+    justify-content: center;
+    text-align: center;
+    align-items: center;
+    /* display: flex; */
+}
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -9,6 +21,9 @@ body {
 
 h1, h2 {
     color: #333;
+    font-family: bion;
+    align-items: center;
+    text-align: center;
 }
 
 /* Link Styles */
@@ -22,6 +37,10 @@ a:hover {
 }
 
 /* Flash Messages */
+#flashMessages {
+    display: none; 
+}
+
 .flash-success {
     padding: 10px;
     background-color: #d4edda;
@@ -44,6 +63,12 @@ form {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
 }
 
 label {
@@ -56,9 +81,16 @@ input[type="number"],
 input[type="submit"] {
     display: block;
     margin-bottom: 20px;
+    width: 40%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    box-sizing: border-box;
 }
 
+
 input[type="submit"] {
+    font-family: bion;
     background-color: #007bff;
     color: white;
     border: none;
@@ -98,6 +130,10 @@ img {
     margin-top: 0;
 }
 
+input#image{
+    color: gray;
+}
+
 @media (max-width: 768px) {
     .result-item {
         width: calc(50% - 20px);
@@ -109,3 +145,4 @@ img {
         width: 100%;
     }
 }
+
