@@ -5,10 +5,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>Results</h1>
-    <p>Your predicted age is: {{ result.predicted_age }}</p>
-    <p>Your actual age is: {{ result.actual_age }}</p>
+    <p>Your predicted age is: {{ specific_result.predicted_age }}</p>
+    <p>Your actual age is: {{ specific_result.actual_age }}</p>
+
+    <!-- Canvas for Chart.js graph -->
+    <div style="width:400px; height:400px; margin:auto;">
+        <canvas id="ageComparisonChart"></canvas>
+    </div>
+
+    <script>
+        var ctx = document.getElementById('ageComparisonChart').getContext('2d');
+        var ageComparisonChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ labels | tojson | safe }},
+                datasets: [{
+                    label: 'Predicted Age',
+                    data: {{ predicted_ages | tojson | safe }},
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    fill: false
+                },
+                {
+                    label: 'Actual Age',
+                    data: {{ actual_ages | tojson | safe }},
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Entry'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Age'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
