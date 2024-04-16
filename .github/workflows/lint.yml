@@ -21,10 +21,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Lint with pylint
-        if: ${{ hashFiles(format('{0}/**/*.py', matrix.subdir)) != '' }}
+        if: ${{ hashFiles(format('{0}/**/*.py', matrix.subdir)) != 'tests' }}
         # you may set pylint to ignore any files or dependencies that make no sense to lint
         run: |
-          --ignore=tests
           cd ${{ matrix.subdir }}
           pylint_score=$(python -m pylint **/*.py | tee /dev/tty | sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p')
           echo "Pylint score was $pylint_score"
