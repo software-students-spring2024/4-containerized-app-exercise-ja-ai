@@ -2,23 +2,23 @@
 Flask App for uploading and processing images.
 """
 
-import base64
+# import base64
 import os
 import queue
 import tempfile
 import threading
 import time
-import traceback
+# import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import flash, Flask, jsonify, render_template, request, redirect, url_for
 import bson
 import gridfs
-from requests.exceptions import RequestException
+# from requests.exceptions import RequestException
 
 # import werkzeug
 from werkzeug.utils import secure_filename
-from pymongo import MongoClient, errors
+from pymongo import MongoClient
 import requests
 
 
@@ -181,9 +181,9 @@ def upload_image():
                     ),
                     200,
                 )
-            except Exception as e:  # add a more specific exception
-                app.logger.error("Upload failed: %s", str(e))
-                return jsonify({"error": "Failed to upload image"}), 500
+            except FileNotFoundError as e:
+                app.logger.error("File upload failed: %s", str(e))
+                return jsonify({"error": "File not found"}), 500
         else:
             return jsonify({"error": "Invalid file type"}), 400
     return render_template("upload.html")
@@ -206,7 +206,7 @@ def show_results(image_id):
         return redirect(url_for("home"))
 
     # Retrieve and encode the image data
-    fs_image = fs.get(obj_id)
+    # fs_image = fs.get(obj_id)
     print("\n\n\nResult\n\n\n")
     print(result)
     # result["predicted_age"] = base64.b64encode(fs_image.read()).decode("utf-8")
