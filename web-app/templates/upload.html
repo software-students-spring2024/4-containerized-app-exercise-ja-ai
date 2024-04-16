@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Upload Image</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
         function startTask() {
             var formData = new FormData(document.getElementById('uploadForm'));
@@ -10,39 +10,33 @@
                 method: 'POST',
                 body: formData,
             })
-            .then(response => response.json())
+            .then(response => {
+                if (response.ok) {
+                    return response.json();  // Proceed only if the response is OK
+                } else {
+                    throw new Error('Failed to start task: Server responded with status ' + response.status);
+                }
+            })
             .then(data => {
                 if (data.task_id) {
                     window.location.href = "/processing/" + data.task_id;  // Redirect to processing page
+                } else {
+                    throw new Error('Response JSON from server does not contain task_id');
                 }
             })
-            .catch(error => alert('Error starting task: ' + error));
+            .catch(error => {
+                console.error('Error starting task:', error);
+                alert('Error starting task: ' + error.message);
+            });
         }
-
-        // hide flash messages if they don't exist
-        function hideFlashMessages() {
-            var flashMessages = document.getElementById('flashMessages');
-            if (flashMessages.innerHTML.trim() === '') {
-                flashMessages.style.display = 'none';
-            }
-        }
-
-        // hide flash messages on page load
-        window.onload = hideFlashMessages;
     </script>
 </head>
 <body>
-    <h1>Age Estimation</h1>
-    <div class="container">
-        <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
-            <h2>Upload Image for Age Estimation</h2>
-            <label for="image">Select image:</label>
-            <input type="file" id="image" name="image" required>
-            <label for="actual_age">Your actual age:</label>
-            <input type="number" id="actual_age" name="actual_age">
-            <input type="submit" value="Upload">
-        </form>
-        <p id="flashMessages">{{ get_flashed_messages() }}</p>
-    </div>
+    <h1>Upload Image for Age Estimation</h1>
+    <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
+        <label for="image">Select image:</label>
+        <input type="file" id="image" name="image" required>
+        <input type="submit" value="Upload">
+    </form>
 </body>
 </html>

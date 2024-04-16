@@ -11,7 +11,9 @@ WORKDIR /usr/src/app
 
 COPY . /usr/src/app
 
-RUN pip install -r requirements.txt
+RUN pip install --retries=5 --default-timeout=300 opencv-python
+RUN pip install --retries=3 --default-timeout=120 -r requirements.txt
+
 
 EXPOSE 5001
 

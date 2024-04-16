@@ -17,13 +17,13 @@ def analyze_image(img_path):
         img_path (str): Path to the image file
 
     Returns:
-        list: Analysis results including age and gender
+        list: Analysis results including age
     """
     try:
         logging.info("Analyzing the image at path: %s", img_path)
-        result = DeepFace.analyze(img_path=img_path, actions=["age", "gender"])
+        result = DeepFace.analyze(img_path=img_path, actions=["age"])
         logging.info("Analysis result: %s", result)
-        return [result[0]["age"], result[0]["gender"]]
+        return result[0]["age"]
     except Exception as e:
         logging.error("An error occurred during image analysis: %s", e)
         raise
