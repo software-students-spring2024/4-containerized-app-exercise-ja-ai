@@ -46,7 +46,7 @@ def analyze():
             {"$set": {"status": "failed"}},
         )
         return jsonify({"error": "No selected file"}), 400
-    
+
     if file:
         path = os.path.join("/tmp", file.filename)
         file.save(path)
