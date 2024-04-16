@@ -35,14 +35,14 @@ def analyze():
     image_id = request.form.get("image_id")
     if "file" not in request.files:
         images_collection.update_one(
-            {"image_id":bson.ObjectId(image_id)},
+            {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "failed"}},
         )
         return jsonify({"error": "No file part"}), 400
     file = request.files["file"]
     if file.filename == "":
         images_collection.update_one(
-            {"image_id":bson.ObjectId(image_id)},
+            {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "failed"}},
         )
         return jsonify({"error": "No selected file"}), 400
@@ -52,7 +52,7 @@ def analyze():
         result = analyze_image(path)
         os.remove(path)
         images_collection.update_one(
-            {"image_id":bson.ObjectId(image_id)},
+            {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "success"}},
         )
         results_collection.insert_one(
@@ -63,8 +63,8 @@ def analyze():
         )
         return jsonify(result)
     images_collection.update_one(
-            {"image_id": bson.ObjectId(image_id)},
-            {"$set": {"status": "failed"}},
+        {"image_id": bson.ObjectId(image_id)},
+        {"$set": {"status": "failed"}},
     )
     return jsonify({"error": "Unknown error"}), 500
 
