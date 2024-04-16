@@ -4,7 +4,7 @@
 
 import os
 from flask import Flask, request, jsonify
-from pymongo import MongoClient, errors
+from pymongo import MongoClient
 import gridfs
 import bson
 from api import analyze_image

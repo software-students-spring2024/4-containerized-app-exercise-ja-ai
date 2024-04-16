@@ -64,15 +64,14 @@ def processing(image_id):
             timeout=1000,
         )
 
-    max_retries = 50
     wait_interval = 5
 
     while True:
         current_image_doc = images_collection.find_one({"image_id": bson.ObjectId(image_id)})
         if current_image_doc and current_image_doc.get("status") == "success":
             return redirect(url_for("show_results", image_id=image_id))
-        elif current_image_doc and current_image_doc.get("status") == "failed":
-            # call a method that prints an error message to the screen
+        if current_image_doc and current_image_doc.get("status") == "failed":
+            # call a method that prints an error message to the screen/ add exception
             print("no")
 
         time.sleep(wait_interval)
@@ -167,8 +166,13 @@ def upload_image():
                     "status": "pending",
                     "upload_date": datetime.now(),
                 })
-                return jsonify({"message": "File uploaded successfully", "task_id": str(image_id)}), 200
-            except Exception as e:
+                return jsonify(
+                    {
+                        "message": "File uploaded successfully",
+                        "task_id": str(image_id)
+                    }
+                ), 200
+            except Exception as e: # add a more specific exception
                 app.logger.error("Upload failed: %s", str(e))
                 return jsonify({"error": "Failed to upload image"}), 500
         else:
@@ -200,7 +204,7 @@ def show_results(image_id):
 
     # Render the results page with the processed data
     return render_template("results.html", result=result)
-  
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=True)
