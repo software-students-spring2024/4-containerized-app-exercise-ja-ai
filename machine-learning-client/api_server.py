@@ -46,11 +46,16 @@ def analyze():
             {"$set": {"status": "failed"}},
         )
         return jsonify({"error": "No selected file"}), 400
+    
     if file:
         path = os.path.join("/tmp", file.filename)
         file.save(path)
         result = analyze_image(path)
         os.remove(path)
+
+        image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
+        actual_age = image_doc.get("actual_age") if image_doc else None
+
         images_collection.update_one(
             {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "success"}},
@@ -59,6 +64,7 @@ def analyze():
             {
                 "image_id": bson.ObjectId(image_id),
                 "predicted_age": result,
+                "actual_age": actual_age
             }
         )
         return jsonify(result)

@@ -32,7 +32,7 @@ results = {}
 # MongoDB connection
 serverOptions = {
     "socketTimeoutMS": 600000,  # 10 minutes
-    "connectTimeoutMS": 30000,  # 30 seconds
+    "connectTimeoutMS": 60000,  # 30 seconds
     "serverSelectionTimeoutMS": 30000,  # 30 seconds
 }
 
@@ -151,10 +151,10 @@ def upload_image():
         or re-render the upload page with appropriate error messages if not.
     """
     if request.method == "POST":
-        if "image" not in request.files:
-            flash("No file part", "error")
-            return jsonify({"error": "No file part"}), 400
         image = request.files["image"]
+        age = request.form["age"]
+        if not image or not age:
+            return jsonify({"error": "Missing image or age"}), 400
         if image.filename == "":
             flash("No selected file", "error")
             return jsonify({"error": "No selected file"}), 400
@@ -168,18 +168,11 @@ def upload_image():
                         "filename": filename,
                         "status": "pending",
                         "upload_date": datetime.now(),
+                        "actual_age": int(age),
                     }
                 )
-                return (
-                    jsonify(
-                        {
-                            "message": "File uploaded successfully",
-                            "task_id": str(image_id),
-                        }
-                    ),
-                    200,
-                )
-            except Exception as e:  # add a more specific exception
+                return jsonify({"message": "File uploaded successfully", "task_id": str(image_id)}), 200
+            except Exception as e:
                 app.logger.error("Upload failed: %s", str(e))
                 return jsonify({"error": "Failed to upload image"}), 500
         else:
@@ -198,18 +191,10 @@ def show_results(image_id):
     # Convert the image_id to a BSON ObjectId
     obj_id = bson.ObjectId(image_id)
     result = results_collection.find_one({"image_id": obj_id})
-    print(result)
     if not result:
         flash("Result not found.", "error")
         return redirect(url_for("home"))
 
-    # Retrieve and encode the image data
-    fs_image = fs.get(obj_id)
-    print("\n\n\nResult\n\n\n")
-    print(result)
-    # result["predicted_age"] = base64.b64encode(fs_image.read()).decode("utf-8")
-
-    # Render the results page with the processed data
     return render_template("results.html", result=result)
 
 

@@ -36,6 +36,8 @@
     <form id="uploadForm" onsubmit="event.preventDefault(); startTask();">
         <label for="image">Select image:</label>
         <input type="file" id="image" name="image" required>
+        <label for="age">Enter your actual age:</label>
+        <input type="number" id="age" name="age" required min="0">
         <input type="submit" value="Upload">
     </form>
 </body>
