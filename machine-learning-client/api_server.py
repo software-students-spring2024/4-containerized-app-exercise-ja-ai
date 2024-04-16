@@ -56,12 +56,14 @@ def analyze():
             {"$set": {"status": "success"}},
         )
         results_collection.insert_one(
-            {"image_id":bson.ObjectId(image_id)},
-            {"$set": {"predicted_age": result}},
+            {
+                "image_id": bson.ObjectId(image_id),
+                "predicted_age": result,
+            }
         )
         return jsonify(result)
     images_collection.update_one(
-            {"image_id":bson.ObjectId(image_id)},
+            {"image_id": bson.ObjectId(image_id)},
             {"$set": {"status": "failed"}},
     )
     return jsonify({"error": "Unknown error"}), 500

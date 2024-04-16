@@ -57,7 +57,7 @@ def processing(image_id):
     with open(temp_filepath, "wb") as f:
         f.write(grid_out.read())
     with open(temp_filepath, "rb") as file:
-        response = requests.post(
+        requests.post(
             "http://machine-learning-client:5001/analyze",
             files={"file": file},
             data={"image_id":str(image_id)},
@@ -67,8 +67,8 @@ def processing(image_id):
     max_retries = 50
     wait_interval = 5
 
-    for i in range(max_retries):
-        current_image_doc = images_collection.find_one({"_id": bson.ObjectId(image_id)})
+    while True:
+        current_image_doc = images_collection.find_one({"image_id": bson.ObjectId(image_id)})
         if current_image_doc and current_image_doc.get("status") == "success":
             return redirect(url_for("show_results", image_id=image_id))
         elif current_image_doc and current_image_doc.get("status") == "failed":
@@ -76,7 +76,7 @@ def processing(image_id):
             print("no")
 
         time.sleep(wait_interval)
-
+    app.logger.error("Something went wrong")
     # call a method that prints an error message to the screen
 
 
@@ -186,14 +186,17 @@ def show_results(image_id):
     """
     # Convert the image_id to a BSON ObjectId
     obj_id = bson.ObjectId(image_id)
-    result = results_collection.find_one({"image_id": obj_id}, {"_id": 0})
+    result = results_collection.find_one({"image_id": obj_id})
+    print(result)
     if not result:
         flash("Result not found.", "error")
         return redirect(url_for("home"))
 
     # Retrieve and encode the image data
     fs_image = fs.get(obj_id)
-    result["predicted_age"] = base64.b64encode(fs_image.read()).decode("utf-8")
+    print("\n\n\nResult\n\n\n")
+    print(result)
+    # result["predicted_age"] = base64.b64encode(fs_image.read()).decode("utf-8")
 
     # Render the results page with the processed data
     return render_template("results.html", result=result)
