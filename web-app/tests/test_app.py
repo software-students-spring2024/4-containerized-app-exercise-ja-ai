@@ -1,20 +1,21 @@
-import pytest
+"""
+Modules for getting correct pathing and correctly importing from app
+"""
 import sys
 import os
 import threading
 import time
-from bson import ObjectId
-from unittest.mock import MagicMock
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import app, allowed_file, process_task
 
+IMAGE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
+                                           "test_png", "tester_photo.png"))
 
-IMAGE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "test_png", "tester_photo.png"))
-
-@pytest.fixture()
-def testing_app():
+@pytest.fixture(name="testing_app")
+def testing_app_fixture():
     """
     Test app for other function tests
     """
@@ -24,22 +25,25 @@ def testing_app():
     })
     yield test_app
 
-@pytest.fixture()
-def client(testing_app):
+@pytest.fixture(name="client")
+def client_fixture(testing_app):
     """
     Test client for other function tests
     """
     return testing_app.test_client()
 
-@pytest.fixture()
-def task_queue():
+@pytest.fixture(name="task_queue")
+def task_queue_fixture():
     """
     Test queue for tasks
     """
     test_queue = []
     yield test_queue
-    
+
 def test_allowed_file():
+    """
+    Test allowed_file function
+    """
     # Tests cases: allowed file types
     print("Testing allowed_file function...")
     # tTest, error message (if failure)
@@ -52,12 +56,17 @@ def test_allowed_file():
     print("All allowed_file tests passed.")
 
 def test_home(client):
+    """
+    Test home function
+    """
     # Test loading home page
     response = client.get('/')
     assert response.status_code == 200
 
 def test_upload_image(client):
-    
+    """
+    Test upload image page and functionality
+    """
     # Test loading upload page
     response = client.get('/upload')
     assert response.status_code == 200
@@ -74,20 +83,27 @@ def test_upload_image(client):
         response = client.post("/upload", data=data)
     assert response.status_code == 400
 
-# Test get response for task
 def test_start_task(client):
+    """
+    Test start_task function
+    """
     data = {"task_id": "12345"}
     response = client.post("/start_task", json=data)
     assert response.status_code == 202
 
-# Test make sure task gets passed
 def test_process_task(task_queue):
+    """
+    Test process_task function
+    """
     task_queue.append("12345")
     threading.Thread(target=process_task, daemon=True).start()
     time.sleep(1)
     assert task_queue == ["12345"]
 
 def test_get_result(client):
+    """
+    Test get_result function
+    """
     task_id = "12345"
     response = client.get(f"/get_result/{task_id}")
     assert response.status_code == 202
