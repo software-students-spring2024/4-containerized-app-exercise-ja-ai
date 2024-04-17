@@ -26,6 +26,8 @@ To install the required dependencies and run the program, run the following comm
 
 To open the app, open a web browser and navigate to [localhost:5002](http://localhost:5002/). Do not go to the address that the program tells you to navigate to.
 
+Please Note that the first time you upload a picture, it will take a while to process. This is because the program is downloading the necessary files to run the machine learning model. Subsequent uploads will be faster.
+
 # Starter Data
 
 No starter data is required.
