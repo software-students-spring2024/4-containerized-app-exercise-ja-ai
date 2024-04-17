@@ -8,7 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <div class="container">
     <h1>Results</h1>
+    <div class="indexForm">
     <p>Your predicted age is: {{ specific_result.predicted_age }}</p>
     <p>Your actual age is: {{ specific_result.actual_age }}</p>
 
@@ -16,7 +18,8 @@
     <div style="width:400px; height:400px; margin:auto;">
         <canvas id="ageComparisonChart"></canvas>
     </div>
-
+    </div>
+    </div>
     <script>
         var ctx = document.getElementById('ageComparisonChart').getContext('2d');
         var ageComparisonChart = new Chart(ctx, {
