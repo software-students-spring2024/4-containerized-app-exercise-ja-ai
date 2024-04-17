@@ -53,35 +53,36 @@ def processing(image_id):
     """
     Instead of threading, let's call process_image directly.
     """
+    try:
+        grid_out = fs.get(bson.ObjectId(image_id))
+        _, temp_filepath = tempfile.mkstemp()
+        with open(temp_filepath, "wb") as f:
+            f.write(grid_out.read())
+        with open(temp_filepath, "rb") as file:
+            requests.post(
+                "http://machine-learning-client:5001/analyze",
+                files={"file": file},
+                data={"image_id": str(image_id)},
+                timeout=1000,
+            )
 
-    grid_out = fs.get(bson.ObjectId(image_id))
-    _, temp_filepath = tempfile.mkstemp()
-    with open(temp_filepath, "wb") as f:
-        f.write(grid_out.read())
-    with open(temp_filepath, "rb") as file:
-        requests.post(
-            "http://machine-learning-client:5001/analyze",
-            files={"file": file},
-            data={"image_id": str(image_id)},
-            timeout=1000,
-        )
+        wait_interval = 5
 
-    wait_interval = 5
+        while True:
+            current_image_doc = images_collection.find_one(
+                {"image_id": bson.ObjectId(image_id)}
+            )
+            if current_image_doc and current_image_doc.get("status") == "success":
+                return redirect(url_for("show_results", image_id=image_id))
+            if current_image_doc and current_image_doc.get("status") == "failed":
+                # call a method that prints an error message to the screen/ add exception
+                app.logger.error("error occurred.")
 
-    while True:
-        current_image_doc = images_collection.find_one(
-            {"image_id": bson.ObjectId(image_id)}
-        )
-        if current_image_doc and current_image_doc.get("status") == "success":
-            return redirect(url_for("show_results", image_id=image_id))
-        if current_image_doc and current_image_doc.get("status") == "failed":
-            # call a method that prints an error message to the screen/ add exception
-            print("no")
-
-        time.sleep(wait_interval)
-    app.logger.error("Something went wrong")
+            time.sleep(wait_interval)
     # call a method that prints an error message to the screen
-
+    except bson.errors.InvalidId:
+        app.logger.error("Invalid image_id provided.")
+        return jsonify({"error": "Invalid image ID"}), 400
 
 def allowed_file(filename):
     """
@@ -199,34 +200,40 @@ def show_results(image_id):
     Returns:
         result.html
     """
-    # Convert the image_id to a BSON ObjectId
-    obj_id = bson.ObjectId(image_id)
-    specific_result = results_collection.find_one({"image_id": obj_id})
-    print(specific_result)
-    if not specific_result:
-        flash("Result not found.", "error")
+    try:
+        # Convert the image_id to a BSON ObjectId
+        obj_id = bson.ObjectId(image_id)
+        specific_result = results_collection.find_one({"image_id": obj_id})
+        print(specific_result)
+        if not specific_result:
+            flash("Result not found.", "error")
+            return redirect(url_for("home"))
+
+        # Fetch all results for the graph
+        all_results = results_collection.find({})
+        predicted_ages = []
+        actual_ages = []
+        labels = []
+        index = 0
+        for result in all_results:
+            if "actual_age" in result and "predicted_age" in result:
+                actual_ages.append(result["actual_age"])
+                predicted_ages.append(result["predicted_age"])
+                labels.append(str(index))  # Use the index or any specific identifier
+                index += 1
+
+        return render_template(
+            "results.html",
+            specific_result=specific_result,
+            predicted_ages=predicted_ages,
+            actual_ages=actual_ages,
+            labels=labels,
+        )
+    except bson.errors.InvalidId:
+        # invalid image ID error
+        flash("Invalid image ID.", "error")
         return redirect(url_for("home"))
 
-    # Fetch all results for the graph
-    all_results = results_collection.find({})
-    predicted_ages = []
-    actual_ages = []
-    labels = []
-    index = 0
-    for result in all_results:
-        if "actual_age" in result and "predicted_age" in result:
-            actual_ages.append(result["actual_age"])
-            predicted_ages.append(result["predicted_age"])
-            labels.append(str(index))  # Use the index or any specific identifier
-            index += 1
-
-    return render_template(
-        "results.html",
-        specific_result=specific_result,
-        predicted_ages=predicted_ages,
-        actual_ages=actual_ages,
-        labels=labels,
-    )
 
 
 if __name__ == "__main__":

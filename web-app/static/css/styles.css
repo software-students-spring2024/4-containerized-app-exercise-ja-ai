@@ -169,6 +169,11 @@ input#image{
   }
 
 
+  #ageComparisonChart{
+    padding-top: 30px;
+  }
+
+
 @media (max-width: 768px) {
     .result-item {
         width: calc(50% - 20px);
