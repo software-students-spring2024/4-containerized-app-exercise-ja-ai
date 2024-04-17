@@ -32,7 +32,7 @@ No starter data is required.
 
 # Contributors
 
+- [Adam Schwartz](https://github.com/aschwartz01)
 - [Alex Kondratiuk](https://github.com/ak8000)
 - [Janet Pan](https://github.com/jp6024)
 - [Isaac Kwon](https://github.com/iok206)
-- [Adam Schwartz](https://github.com/aschwartz01)
