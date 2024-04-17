@@ -76,8 +76,8 @@ def test_upload_image(client):
     with open(IMAGE_PATH, "rb") as image_file:
         # Define data and files properly
         data = {
-            "age": (None, "30"),  # This is how you normally send non-file fields
-            "image": (image_file, "tester_photo.png")  # Ensuring the file tuple is correct
+            "age": (None, "30"),
+            "image": (image_file, "tester_photo.png")
         }
         # Flask test client handles content-type automatically here
         response = client.post("/upload", data=data)
