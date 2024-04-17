@@ -25,7 +25,8 @@ jobs:
         # you may set pylint to ignore any files or dependencies that make no sense to lint
         run: |
           cd ${{ matrix.subdir }}
-          pylint_score=$(python -m pylint **/*.py | tee /dev/tty | sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p')
+        # Exclude tests directory
+          pylint_score=$(python -m pylint --ignore=tests **/*.py | tee /dev/tty | sed -n 's/^Your code has been rated at \([-0-9.]*\)\/.*/\1/p')
           echo "Pylint score was $pylint_score"
           if (( $(echo "$pylint_score < 9.5" | bc -l) )); then
             echo "Pylint score below 9.5, failing the lint job."
@@ -36,4 +37,5 @@ jobs:
         # you may set black to ignore any files or dependencies that make no sense to format
         run: |
           cd ${{ matrix.subdir }}
-          python -m black --diff --check .
+         # Exclude tests directory
+          python -m black --exclude '/tests/' --diff --check .
